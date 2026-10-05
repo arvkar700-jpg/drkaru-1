@@ -1,0 +1,1004 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KaruScan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one working column (max 1080px). Summary strip → import → review list → how-to. Rows, not cards. */
+:root {
+  --ground: #F1F4EF;
+  --surface: #FAFBF8;
+  --sunk: #E7ECE5;
+  --ink: #17201C;
+  --muted: #56635C;
+  --line: #D3DBD2;
+  --accent: #1F5A6E;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #DCE9EC;
+  --ok: #2B7A4B;
+  --ok-soft: #DDEFE2;
+  --warn: #9A5B00;
+  --warn-soft: #F6E8CF;
+  --bad: #B3261E;
+  --bad-soft: #F8DEDA;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #101513; --surface: #161D1A; --sunk: #1D2622; --ink: #E4EBE6; --muted: #97A49D; --line: #2A3631;
+    --accent: #86C3D6; --accent-ink: #0D1A1F; --accent-soft: #1C3138;
+    --ok: #6DC48F; --ok-soft: #173024; --warn: #E4AA4B; --warn-soft: #33270F; --bad: #F2867A; --bad-soft: #3A1C19;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #101513; --surface: #161D1A; --sunk: #1D2622; --ink: #E4EBE6; --muted: #97A49D; --line: #2A3631;
+  --accent: #86C3D6; --accent-ink: #0D1A1F; --accent-soft: #1C3138;
+  --ok: #6DC48F; --ok-soft: #173024; --warn: #E4AA4B; --warn-soft: #33270F; --bad: #F2867A; --bad-soft: #3A1C19;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.55 var(--font-body); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: flex; flex-direction: column; gap: 36px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h2 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.01em; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; }
+a { color: var(--accent); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+button, .btn, select, input, textarea { font: inherit; color: inherit; }
+button, .btn {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer; text-decoration: none;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  padding: 8px 14px; border-radius: 8px; font-weight: 500; font-size: 0.9rem; line-height: 1.2;
+}
+button:hover, .btn:hover { border-color: var(--accent); }
+button.primary, .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.danger { color: var(--bad); }
+button:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+select, input[type="date"], textarea {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 10px; font-size: 0.9rem;
+}
+
+/* Header */
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px; }
+.brand { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.wordmark { font-size: clamp(2.1rem, 6vw, 3.1rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.wordmark span { color: var(--accent); }
+.tagline { font-size: 1.05rem; color: var(--muted); max-width: 52ch; }
+.privacy { display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; background: var(--ok-soft); color: var(--ok); padding: 6px 12px; border-radius: 999px; font-weight: 500; }
+.privacy svg { flex: none; }
+
+/* Example banner */
+.banner { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; background: var(--warn-soft); color: var(--ink); border: 1px solid var(--warn); border-radius: var(--r); padding: 12px 16px; }
+.banner strong { color: var(--warn); }
+
+/* Summary strip */
+.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-block: 2px solid var(--ink); }
+.stat { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.stat + .stat { border-left: 1px solid var(--line); }
+.stat .v { font-family: var(--font-display); font-size: clamp(1.5rem, 3.6vw, 2.2rem); font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.stat .v.bad { color: var(--bad); }
+.stat .v.ok { color: var(--ok); }
+.stat .hint { font-size: 0.82rem; color: var(--muted); }
+@media (max-width: 760px) {
+  .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat:nth-child(3) { border-left: 0; }
+  .stat:nth-child(n+3) { border-top: 1px solid var(--line); }
+}
+
+.insights { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.insights li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); }
+.insights li .dot { flex: none; width: 9px; height: 9px; border-radius: 50%; margin-top: 7px; background: var(--muted); }
+.insights li.bad .dot { background: var(--bad); }
+.insights li.warn .dot { background: var(--warn); }
+.insights li.info .dot { background: var(--accent); }
+
+/* Sections */
+section { display: flex; flex-direction: column; gap: 16px; }
+.sec-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+.sec-head h2 .n { font-family: var(--font-mono); font-weight: 500; font-size: 0.9rem; color: var(--accent); margin-right: 10px; vertical-align: 2px; }
+
+/* Import */
+.import { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 760px) { .import { grid-template-columns: minmax(0, 1fr); } }
+.drop { border: 2px dashed var(--line); border-radius: var(--r); padding: 22px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; background: var(--surface); transition: border-color .15s, background .15s; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.paste { display: flex; flex-direction: column; gap: 10px; }
+.paste textarea { width: 100%; min-height: 138px; resize: vertical; font-family: var(--font-mono); font-size: 0.8rem; }
+.row-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toast { padding: 10px 14px; border-radius: 8px; font-size: 0.9rem; }
+.toast.ok { background: var(--ok-soft); color: var(--ok); }
+.toast.err { background: var(--bad-soft); color: var(--bad); }
+
+/* Filters */
+.filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.filters button { border-radius: 999px; padding: 6px 12px; font-size: 0.85rem; }
+.filters button[aria-pressed="true"] { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.filters .count { font-family: var(--font-mono); opacity: .75; }
+
+/* Subscription list */
+.list { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.sub { border-bottom: 1px solid var(--line); padding: 16px 4px; display: flex; flex-direction: column; gap: 12px; }
+.sub.flag-bad { background: linear-gradient(90deg, var(--bad-soft), transparent 70%); }
+.sub-main { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.3fr) minmax(0, 1.6fr) 190px; gap: 12px 20px; align-items: center; }
+@media (max-width: 860px) { .sub-main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .sub-main .actions { grid-column: 1 / -1; } }
+.sub-name { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sub-name .nm { font-weight: 600; font-size: 1.02rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sub-name .desc { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); overflow-wrap: anywhere; }
+.chip { font-size: 0.7rem; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; background: var(--sunk); color: var(--muted); font-weight: 600; }
+.money { display: flex; flex-direction: column; gap: 2px; }
+.money .amt { font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+.usage { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.usage select { width: 100%; }
+.actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+@media (max-width: 860px) { .actions { flex-direction: row; align-items: center; justify-content: space-between; } }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.cancel, .pill.dispute, .pill.after { background: var(--bad-soft); color: var(--bad); }
+.pill.review { background: var(--warn-soft); color: var(--warn); }
+.pill.keep { background: var(--ok-soft); color: var(--ok); }
+.pill.cancelled { background: var(--sunk); color: var(--muted); }
+.sub.is-cancelled .sub-name .nm { text-decoration: line-through; text-decoration-color: var(--muted); }
+
+.how { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 760px) { .how { grid-template-columns: minmax(0, 1fr); } }
+.how ol { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; }
+.how .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.charges { font-family: var(--font-mono); font-size: 0.8rem; display: grid; grid-template-columns: auto auto; justify-content: start; gap: 2px 18px; font-variant-numeric: tabular-nums; }
+.charges .after { color: var(--bad); font-weight: 500; }
+.cancel-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.note { font-size: 0.85rem; color: var(--muted); }
+.copybox { width: 100%; min-height: 160px; font-family: var(--font-mono); font-size: 0.78rem; }
+
+.empty { padding: 36px 16px; text-align: center; color: var(--muted); border-bottom: 1px solid var(--line); }
+
+/* About */
+.about { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 760px) { .about { grid-template-columns: minmax(0, 1fr); } }
+.about > div { display: flex; flex-direction: column; gap: 6px; }
+.about p { color: var(--muted); font-size: 0.92rem; max-width: 60ch; }
+details.tools { border-top: 1px solid var(--line); padding-top: 14px; }
+details.tools summary { cursor: pointer; font-weight: 600; }
+details.tools .inner { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
+.settings { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+.settings label { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.settings input[type="text"] { width: 70px; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 8px; }
+footer { color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--line); padding-top: 16px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="wordmark" aria-label="KaruScan">Karu<span>Scan</span></div>
+      <p class="tagline">Find the AI tools and app subscriptions quietly charging your card, see which ones you don't use, and stop them.</p>
+    </div>
+    <div class="privacy" title="Statements are read inside your browser. Nothing is uploaded.">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      Your statement stays on this device
+    </div>
+  </header>
+
+  <div id="banner" class="banner" hidden>
+    <p><strong>Example statement loaded.</strong> These charges are made up to show how KaruScan works. Add your own statement below to replace them.</p>
+    <button type="button" id="clearExample">Clear example</button>
+  </div>
+
+  <div class="summary" id="summary" aria-live="polite"></div>
+  <ul class="insights" id="insights"></ul>
+
+  <section id="import">
+    <div class="sec-head">
+      <h2><span class="n">1</span>Add a bank or card statement</h2>
+      <p class="muted small">Add several months for best results. Recurring charges need at least two months to show up.</p>
+    </div>
+    <div class="import">
+      <div class="drop" id="drop">
+        <h3>Upload a CSV export</h3>
+        <p class="muted small">Download your transactions as CSV from internet banking (most banks offer “Export” or “Download” on the transaction history page), then choose the file or drop it here.</p>
+        <div class="row-btns">
+          <label class="btn primary" for="file">Choose statement file</label>
+          <input id="file" type="file" accept=".csv,.txt,text/csv,text/plain" multiple hidden>
+          <button type="button" id="loadExample">Load example</button>
+        </div>
+      </div>
+      <div class="paste">
+        <h3>Or paste statement text</h3>
+        <p class="muted small">Have a PDF statement? Open it, select all (Ctrl/⌘ + A), copy, and paste here. Each line should start with a date.</p>
+        <textarea id="pasteBox" spellcheck="false" placeholder="03/09/2026  OPENAI *CHATGPT SUBSCR   84.60   1,203.55&#10;09/09/2026  CLAUDE.AI SUBSCRIPTION   84.60   1,118.95"></textarea>
+        <div class="row-btns"><button type="button" class="primary" id="scanPaste">Scan pasted text</button></div>
+      </div>
+    </div>
+    <div id="toast" class="toast" hidden></div>
+  </section>
+
+  <section id="review">
+    <div class="sec-head">
+      <h2><span class="n">2</span>Review each subscription</h2>
+      <p class="muted small">Tell KaruScan when you last used each one. It recommends what to keep, cancel or dispute.</p>
+    </div>
+    <div class="filters" id="filters" role="group" aria-label="Filter subscriptions"></div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2><span class="n">3</span>How cancelling works</h2></div>
+    <div class="about">
+      <div>
+        <h3>Cancel at the source</h3>
+        <p>Open “How to cancel” on any row. KaruScan links to that company's billing page and lists the steps. Cancelling there stops the next charge. Bank blocks alone often don't, because companies can re-bill a new card.</p>
+      </div>
+      <div>
+        <h3>Dispute what you don't recognise</h3>
+        <p>Mark a charge “I don't recognise this” and KaruScan writes a dispute letter for your bank's card services team, asking them to reverse the charges, block the merchant and advise on replacing your card.</p>
+      </div>
+      <div>
+        <h3>Check the next statement</h3>
+        <p>After you mark something cancelled, add next month's statement. If the same company charges you again, KaruScan flags it in red so you can claim a refund.</p>
+      </div>
+    </div>
+    <details class="tools">
+      <summary>Settings, backup and report</summary>
+      <div class="inner">
+        <div class="settings">
+          <label for="cur">Currency symbol <input id="cur" type="text" maxlength="4" value="K"></label>
+          <label for="dateOrder">Dates in my statement are
+            <select id="dateOrder"><option value="dmy">day / month / year</option><option value="mdy">month / day / year</option></select>
+          </label>
+        </div>
+        <div class="row-btns">
+          <button type="button" id="copyReport">Copy report (CSV)</button>
+          <button type="button" id="copyBackup">Copy backup</button>
+          <button type="button" id="restoreBackup">Restore from backup</button>
+          <button type="button" class="danger" id="eraseAll">Erase all data</button>
+        </div>
+        <textarea id="ioBox" class="copybox" spellcheck="false" hidden></textarea>
+        <p id="ioMsg" class="note" hidden></p>
+        <p class="note">KaruScan saves your subscriptions and decisions in this browser only. Use “Copy backup” and keep the text somewhere safe if you want to move to another device.</p>
+      </div>
+    </details>
+  </section>
+
+  <footer>
+    KaruScan cannot sign in to your bank or your app accounts, so the final “Cancel” click is always yours. It reads your statement in this browser, finds the subscriptions, tells you which to stop, takes you to the right page, and drafts the emails. Billing pages change from time to time. If a link has moved, open the company's site and look under Settings → Billing or Subscription.
+  </footer>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- Known subscriptions: how they appear on statements and how to cancel ---------- */
+const APPSTORE_NOTE = 'If you signed up inside the iPhone or Android app, the charge comes through Apple or Google Play instead. Cancel it there.';
+const CATALOG = [
+  { id: 'chatgpt', name: 'ChatGPT (OpenAI)', cat: 'AI chat', re: /OPENAI|CHATGPT/, url: 'https://chatgpt.com/',
+    steps: ['Sign in at chatgpt.com', 'Click your profile picture → Settings', 'Open Account (or Subscription) → Manage', 'Choose Cancel plan and confirm', APPSTORE_NOTE] },
+  { id: 'claude', name: 'Claude (Anthropic)', cat: 'AI chat', re: /ANTHROPIC|CLAUDE\.?AI|CLAUDE SUB/, url: 'https://claude.ai/settings/billing',
+    steps: ['Sign in at claude.ai', 'Open Settings → Billing', 'Click Cancel plan and confirm', APPSTORE_NOTE] },
+  { id: 'gemini', name: 'Google One / Gemini', cat: 'AI chat', re: /GOOGLE\s*\*?\s*(ONE|GEMINI|STORAGE)|GOOGLE ONE|GEMINI/, url: 'https://one.google.com/',
+    steps: ['Open one.google.com and sign in with the Google account that pays', 'Open Settings → Manage membership', 'Choose Cancel membership'] },
+  { id: 'youtube', name: 'YouTube Premium', cat: 'Entertainment', re: /YOUTUBE/, url: 'https://www.youtube.com/paid_memberships',
+    steps: ['Open youtube.com/paid_memberships', 'Choose Deactivate next to the membership', 'Confirm the cancellation'] },
+  { id: 'googleplay', name: 'Google Play (Android app)', cat: 'App store', re: /GOOGLE\s*\*|GOOGLE PLAY|GOOGLE PAYMENT/, url: 'https://play.google.com/store/account/subscriptions', via: true,
+    steps: ['Open play.google.com/store/account/subscriptions (or Play Store app → profile → Payments & subscriptions → Subscriptions)', 'Find the app that is charging you', 'Tap Cancel subscription'] },
+  { id: 'apple', name: 'Apple (App Store / iCloud)', cat: 'App store', re: /APPLE\.COM|ITUNES|APPLE SERVICES|APPLE ONE/, url: 'https://apps.apple.com/account/subscriptions', via: true,
+    steps: ['On iPhone: Settings → tap your name → Subscriptions', 'Or open apps.apple.com/account/subscriptions on a computer', 'Pick the app that is charging you and tap Cancel Subscription', 'Apple bills many apps under one name. Check your email for “Your receipt from Apple” to see which app.'] },
+  { id: 'microsoft', name: 'Microsoft 365 / Copilot Pro', cat: 'AI chat', re: /MICROSOFT|MSFT|MS \*|COPILOT PRO|XBOX/, url: 'https://account.microsoft.com/services',
+    steps: ['Sign in at account.microsoft.com/services', 'Find the subscription (Microsoft 365, Copilot Pro, Xbox)', 'Choose Cancel subscription or turn off recurring billing'] },
+  { id: 'github', name: 'GitHub Copilot', cat: 'AI coding', re: /GITHUB/, url: 'https://github.com/settings/billing',
+    steps: ['Sign in at github.com', 'Open Settings → Billing and plans', 'Cancel Copilot or downgrade your plan'] },
+  { id: 'perplexity', name: 'Perplexity Pro', cat: 'AI chat', re: /PERPLEXITY/, url: 'https://www.perplexity.ai/settings/account',
+    steps: ['Sign in at perplexity.ai', 'Open Settings → Account (or Subscription)', 'Choose Manage subscription → Cancel', APPSTORE_NOTE] },
+  { id: 'grok', name: 'X Premium / Grok', cat: 'AI chat', re: /X CORP|TWITTER|\bX\.COM|\bXAI\b|GROK/, url: 'https://x.com/settings',
+    steps: ['Sign in at x.com', 'Open Settings → Premium (or Subscriptions)', 'Choose Manage subscription → Cancel', APPSTORE_NOTE] },
+  { id: 'poe', name: 'Poe', cat: 'AI chat', re: /POE\.COM|QUORA/, url: 'https://poe.com/settings', steps: ['Sign in at poe.com', 'Open Settings → Subscription', 'Cancel the subscription', APPSTORE_NOTE] },
+  { id: 'mistral', name: 'Mistral Le Chat', cat: 'AI chat', re: /MISTRAL/, url: 'https://chat.mistral.ai/', steps: ['Sign in at chat.mistral.ai', 'Open Settings → Subscription', 'Cancel the plan'] },
+  { id: 'characterai', name: 'Character.AI', cat: 'AI chat', re: /CHARACTER\.?AI/, url: 'https://character.ai/', steps: ['Sign in at character.ai', 'Open Settings → Subscription', 'Cancel c.ai+', APPSTORE_NOTE] },
+  { id: 'manus', name: 'Manus', cat: 'AI chat', re: /MANUS/, url: 'https://manus.im/', steps: ['Sign in to Manus', 'Open Settings → Billing or Subscription', 'Cancel the plan'] },
+  { id: 'midjourney', name: 'Midjourney', cat: 'AI image & video', re: /MIDJOURNEY/, url: 'https://www.midjourney.com/account',
+    steps: ['Sign in at midjourney.com', 'Open Manage Subscription', 'Choose Cancel plan'] },
+  { id: 'runway', name: 'Runway', cat: 'AI image & video', re: /RUNWAY ?ML|RUNWAYML/, url: 'https://app.runwayml.com/', steps: ['Sign in to Runway', 'Open Settings → Plans / Billing', 'Cancel the plan'] },
+  { id: 'leonardo', name: 'Leonardo.ai', cat: 'AI image & video', re: /LEONARDO/, url: 'https://app.leonardo.ai/', steps: ['Sign in to Leonardo', 'Open Settings → Subscription', 'Cancel the plan'] },
+  { id: 'ideogram', name: 'Ideogram', cat: 'AI image & video', re: /IDEOGRAM/, url: 'https://ideogram.ai/', steps: ['Sign in to Ideogram', 'Open Settings → Billing', 'Cancel the plan'] },
+  { id: 'pika', name: 'Pika', cat: 'AI image & video', re: /PIKA\.?ART|PIKA LABS/, url: 'https://pika.art/', steps: ['Sign in to Pika', 'Open Account → Subscription', 'Cancel the plan'] },
+  { id: 'heygen', name: 'HeyGen', cat: 'AI image & video', re: /HEYGEN/, url: 'https://app.heygen.com/', steps: ['Sign in to HeyGen', 'Open Settings → Subscriptions & billing', 'Cancel the plan'] },
+  { id: 'synthesia', name: 'Synthesia', cat: 'AI image & video', re: /SYNTHESIA/, url: 'https://app.synthesia.io/', steps: ['Sign in to Synthesia', 'Open Account → Billing', 'Cancel the plan'] },
+  { id: 'canva', name: 'Canva Pro', cat: 'Design', re: /CANVA/, url: 'https://www.canva.com/settings/billing-and-plans',
+    steps: ['Sign in at canva.com', 'Open Settings → Billing & plans', 'Choose Cancel subscription', APPSTORE_NOTE] },
+  { id: 'adobe', name: 'Adobe (Acrobat, Firefly, Creative Cloud)', cat: 'Design', re: /ADOBE/, url: 'https://account.adobe.com/plans',
+    steps: ['Sign in at account.adobe.com/plans', 'Choose Manage plan → Cancel your plan', 'Annual plans paid monthly can carry an early-cancellation fee. Adobe shows it before you confirm.'] },
+  { id: 'gamma', name: 'Gamma', cat: 'Design', re: /GAMMA/, url: 'https://gamma.app/settings/billing', steps: ['Sign in at gamma.app', 'Open Settings → Billing', 'Cancel the plan'] },
+  { id: 'elevenlabs', name: 'ElevenLabs', cat: 'AI audio', re: /ELEVEN ?LABS/, url: 'https://elevenlabs.io/app/subscription', steps: ['Sign in to ElevenLabs', 'Open Subscription', 'Cancel the plan'] },
+  { id: 'suno', name: 'Suno', cat: 'AI audio', re: /\bSUNO\b/, url: 'https://suno.com/', steps: ['Sign in to Suno', 'Open Subscription / Billing', 'Cancel the plan', APPSTORE_NOTE] },
+  { id: 'descript', name: 'Descript', cat: 'AI audio', re: /DESCRIPT/, url: 'https://web.descript.com/', steps: ['Sign in to Descript', 'Open Settings → Billing', 'Cancel the plan'] },
+  { id: 'otter', name: 'Otter.ai', cat: 'AI audio', re: /OTTER\.?AI|OTTER /, url: 'https://otter.ai/', steps: ['Sign in at otter.ai', 'Open Account settings → Plans & billing', 'Cancel the plan', APPSTORE_NOTE] },
+  { id: 'fireflies', name: 'Fireflies.ai', cat: 'AI audio', re: /FIREFLIES/, url: 'https://app.fireflies.ai/', steps: ['Sign in to Fireflies', 'Open Settings → Billing', 'Cancel the plan'] },
+  { id: 'cursor', name: 'Cursor', cat: 'AI coding', re: /CURSOR|ANYSPHERE/, url: 'https://cursor.com/settings', steps: ['Sign in at cursor.com', 'Open Settings → Billing', 'Choose Manage subscription → Cancel'] },
+  { id: 'replit', name: 'Replit', cat: 'AI coding', re: /REPLIT/, url: 'https://replit.com/account', steps: ['Sign in at replit.com', 'Open Account → Billing', 'Cancel the plan'] },
+  { id: 'lovable', name: 'Lovable', cat: 'AI coding', re: /LOVABLE/, url: 'https://lovable.dev/', steps: ['Sign in to Lovable', 'Open Settings → Plans & billing', 'Cancel the plan'] },
+  { id: 'bolt', name: 'Bolt.new (StackBlitz)', cat: 'AI coding', re: /STACKBLITZ|BOLT\.NEW/, url: 'https://bolt.new/', steps: ['Sign in to Bolt', 'Open Settings → Subscription', 'Cancel the plan'] },
+  { id: 'supabase', name: 'Supabase', cat: 'AI coding', re: /SUPABASE/, url: 'https://supabase.com/dashboard', steps: ['Sign in to the Supabase dashboard', 'Open Organization → Billing', 'Downgrade to Free or pause unused projects'] },
+  { id: 'grammarly', name: 'Grammarly', cat: 'AI writing', re: /GRAMMARLY/, url: 'https://account.grammarly.com/subscription', steps: ['Sign in at account.grammarly.com', 'Open Subscription', 'Choose Cancel subscription'] },
+  { id: 'quillbot', name: 'QuillBot', cat: 'AI writing', re: /QUILLBOT/, url: 'https://quillbot.com/account', steps: ['Sign in at quillbot.com', 'Open Account → Subscription', 'Cancel the plan'] },
+  { id: 'jasper', name: 'Jasper', cat: 'AI writing', re: /JASPER/, url: 'https://app.jasper.ai/', steps: ['Sign in to Jasper', 'Open Settings → Billing', 'Cancel the plan'] },
+  { id: 'copyai', name: 'Copy.ai', cat: 'AI writing', re: /COPY\.?AI/, url: 'https://app.copy.ai/', steps: ['Sign in to Copy.ai', 'Open Settings → Billing', 'Cancel the plan'] },
+  { id: 'writesonic', name: 'Writesonic', cat: 'AI writing', re: /WRITESONIC/, url: 'https://app.writesonic.com/', steps: ['Sign in to Writesonic', 'Open Billing', 'Cancel the plan'] },
+  { id: 'wordtune', name: 'Wordtune', cat: 'AI writing', re: /WORDTUNE|AI21/, url: 'https://www.wordtune.com/', steps: ['Sign in to Wordtune', 'Open Account → Plan', 'Cancel the plan'] },
+  { id: 'jenni', name: 'Jenni AI', cat: 'AI writing', re: /JENNI/, url: 'https://app.jenni.ai/', steps: ['Sign in to Jenni', 'Open Settings → Subscription', 'Cancel the plan'] },
+  { id: 'phrasly', name: 'Phrasly', cat: 'AI writing', re: /PHRASLY/, url: 'https://phrasly.ai/', steps: ['Sign in to Phrasly', 'Open Account → Subscription', 'Cancel the plan'] },
+  { id: 'undetectable', name: 'Undetectable AI', cat: 'AI writing', re: /UNDETECTABLE/, url: 'https://undetectable.ai/', steps: ['Sign in to Undetectable AI', 'Open Account → Subscription', 'Cancel the plan'] },
+  { id: 'deepl', name: 'DeepL Pro', cat: 'AI writing', re: /DEEPL/, url: 'https://www.deepl.com/account', steps: ['Sign in at deepl.com', 'Open Account → Plan', 'Cancel subscription'] },
+  { id: 'scite', name: 'scite', cat: 'Research', re: /SCITE/, url: 'https://scite.ai/', steps: ['Sign in at scite.ai', 'Open Account settings → Subscription', 'Cancel the plan'] },
+  { id: 'consensus', name: 'Consensus', cat: 'Research', re: /CONSENSUS/, url: 'https://consensus.app/', steps: ['Sign in at consensus.app', 'Open Account → Manage subscription', 'Cancel the plan'] },
+  { id: 'elicit', name: 'Elicit', cat: 'Research', re: /ELICIT/, url: 'https://elicit.com/', steps: ['Sign in at elicit.com', 'Open Settings → Billing', 'Cancel the plan'] },
+  { id: 'scispace', name: 'SciSpace', cat: 'Research', re: /SCISPACE|TYPESET/, url: 'https://scispace.com/', steps: ['Sign in to SciSpace', 'Open Account → Subscription', 'Cancel the plan'] },
+  { id: 'paperpal', name: 'Paperpal', cat: 'Research', re: /PAPERPAL|CACTUS COMM/, url: 'https://paperpal.com/', steps: ['Sign in to Paperpal', 'Open Account → Subscription', 'Cancel the plan'] },
+  { id: 'zotero', name: 'Zotero Storage', cat: 'Research', re: /ZOTERO/, url: 'https://www.zotero.org/settings/storage', steps: ['Sign in at zotero.org', 'Open Settings → Storage', 'Turn off auto-renew'] },
+  { id: 'endnote', name: 'EndNote', cat: 'Research', re: /ENDNOTE|CLARIVATE/, url: 'https://endnote.com/', steps: ['Check the EndNote order email for the renewal option', 'Contact EndNote support to turn off auto-renewal'] },
+  { id: 'notion', name: 'Notion', cat: 'Productivity', re: /NOTION/, url: 'https://www.notion.so/', steps: ['Open Notion', 'Settings → Billing (or Plans)', 'Downgrade to Free, or remove the Notion AI add-on'] },
+  { id: 'zoom', name: 'Zoom', cat: 'Productivity', re: /ZOOM\.US|ZOOM VIDEO|ZOOM\.COM/, url: 'https://zoom.us/billing', steps: ['Sign in at zoom.us', 'Open Account Management → Billing', 'Choose Cancel Subscription'] },
+  { id: 'dropbox', name: 'Dropbox', cat: 'Productivity', re: /DROPBOX/, url: 'https://www.dropbox.com/account/plan', steps: ['Sign in at dropbox.com', 'Open Settings → Plan', 'Choose Cancel plan'] },
+  { id: 'linkedin', name: 'LinkedIn Premium', cat: 'Productivity', re: /LINKEDIN/, url: 'https://www.linkedin.com/premium/manage', steps: ['Sign in at linkedin.com', 'Open Me → Premium features → Manage Premium account', 'Choose Cancel subscription'] },
+  { id: 'zapier', name: 'Zapier', cat: 'Productivity', re: /ZAPIER/, url: 'https://zapier.com/app/settings/billing', steps: ['Sign in to Zapier', 'Open Settings → Billing', 'Downgrade or cancel'] },
+  { id: 'calendly', name: 'Calendly', cat: 'Productivity', re: /CALENDLY/, url: 'https://calendly.com/app/admin/billing', steps: ['Sign in to Calendly', 'Open Admin → Billing', 'Downgrade to Free'] },
+  { id: 'netflix', name: 'Netflix', cat: 'Entertainment', re: /NETFLIX/, url: 'https://www.netflix.com/cancelplan', steps: ['Sign in at netflix.com', 'Open Account → Cancel membership'] },
+  { id: 'spotify', name: 'Spotify Premium', cat: 'Entertainment', re: /SPOTIFY/, url: 'https://www.spotify.com/account/subscription/', steps: ['Sign in at spotify.com/account', 'Open Manage your plan', 'Choose Cancel Premium'] },
+  { id: 'prime', name: 'Amazon Prime', cat: 'Entertainment', re: /AMAZON PRIME|PRIME VIDEO|AMZN PRIME|PRIMEVIDEO/, url: 'https://www.amazon.com/mc', steps: ['Sign in at amazon.com', 'Open Account → Prime Membership → Manage', 'Choose End membership'] },
+  { id: 'disney', name: 'Disney+', cat: 'Entertainment', re: /DISNEY/, url: 'https://www.disneyplus.com/account', steps: ['Sign in at disneyplus.com', 'Open Account → Subscription', 'Choose Cancel subscription'] },
+  { id: 'paddle', name: 'App billed through Paddle', cat: 'Reseller', re: /PADDLE/, url: 'https://paddle.net/', via: true,
+    steps: ['Paddle bills on behalf of thousands of small software companies', 'Open paddle.net and enter the email you used, or the order number from the charge', 'Paddle shows which app it is and lets you cancel', 'Search your email for “Paddle” receipts to find the app name'] },
+  { id: 'fastspring', name: 'App billed through FastSpring', cat: 'Reseller', re: /FASTSPRING|\bFS \*/, url: 'https://fastspring.com/consumer-support/', via: true,
+    steps: ['FastSpring bills on behalf of software companies. The app name usually follows “FS *” on the statement', 'Open FastSpring consumer support and look up your order with your email', 'Cancel the subscription there or follow the link in your receipt email'] },
+  { id: 'twocheckout', name: 'App billed through 2Checkout / Verifone', cat: 'Reseller', re: /2CO\b|2CHECKOUT|VERIFONE/, url: 'https://secure.2co.com/myaccount/', via: true,
+    steps: ['2Checkout bills on behalf of software companies', 'Open the 2Checkout customer account page and look up your order by email', 'Turn off automatic renewal'] }
+];
+const CAT_BY_ID = Object.fromEntries(CATALOG.map(c => [c.id, c]));
+
+const USAGE = [
+  ['', 'When did you last use it?'],
+  ['week', 'In the last week'],
+  ['month', 'In the last month'],
+  ['quarter', '1 to 3 months ago'],
+  ['old', 'Over 3 months ago'],
+  ['never', 'Never, or can\'t remember'],
+  ['unknown', 'I don\'t recognise this charge']
+];
+const USAGE_LABEL = Object.fromEntries(USAGE);
+const REC = {
+  keep: 'Keep', review: 'Review', cancel: 'Cancel this', dispute: 'Dispute with bank',
+  cancelled: 'Cancelled', after: 'Charged after cancelling'
+};
+
+/* ---------- State ---------- */
+const STORE_KEY = 'karuscan.v1';
+let S = { txns: [], meta: {}, settings: { cur: 'K', order: 'dmy' }, example: false };
+let filter = 'all';
+const openRows = new Set();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (d && Array.isArray(d.txns)) { S = Object.assign(S, d); return true; }
+    }
+  } catch (e) { /* storage unavailable */ }
+  return false;
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable */ }
+}
+
+/* ---------- Helpers ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const nf = new Intl.NumberFormat('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = n => `${S.settings.cur || ''} ${nf.format(n || 0)}`.trim();
+const MONTHS = { JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5, JUL: 6, AUG: 7, SEP: 8, SEPT: 8, OCT: 9, NOV: 10, DEC: 11 };
+const DAY = 86400000;
+const iso = d => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
+const fmtDate = s => { const d = new Date(s + 'T12:00:00'); return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }); };
+const todayIso = () => iso(new Date());
+
+function mkDate(y, m, d) {
+  if (y < 100) y += 2000;
+  if (m < 0 || m > 11 || d < 1 || d > 31 || y < 1990 || y > 2100) return null;
+  const dt = new Date(y, m, d, 12);
+  return dt.getMonth() === m ? iso(dt) : null;
+}
+// Returns { date: 'YYYY-MM-DD', len } for a date at the start of the string, or null.
+function parseDateAt(s) {
+  s = String(s || '');
+  let m = s.match(/^\s*(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if (m) { const d = mkDate(+m[1], +m[2] - 1, +m[3]); return d && { date: d, len: m[0].length }; }
+  m = s.match(/^\s*(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/);
+  if (m) {
+    let a = +m[1], b = +m[2], day, mon;
+    if (a > 12) { day = a; mon = b; } else if (b > 12) { day = b; mon = a; }
+    else if (S.settings.order === 'mdy') { mon = a; day = b; } else { day = a; mon = b; }
+    const d = mkDate(+m[3], mon - 1, day); return d && { date: d, len: m[0].length };
+  }
+  m = s.match(/^\s*(\d{1,2})[\s\-\/]?([A-Za-z]{3,9})\.?[\s\-\/,]*(\d{4}|\d{2})(?!\d)/);
+  if (m && MONTHS[m[2].slice(0, 3).toUpperCase()] !== undefined) {
+    const d = mkDate(+m[3], MONTHS[m[2].slice(0, 3).toUpperCase()], +m[1]); return d && { date: d, len: m[0].length };
+  }
+  m = s.match(/^\s*([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})/);
+  if (m && MONTHS[m[1].slice(0, 3).toUpperCase()] !== undefined) {
+    const d = mkDate(+m[3], MONTHS[m[1].slice(0, 3).toUpperCase()], +m[2]); return d && { date: d, len: m[0].length };
+  }
+  return null;
+}
+// Parses "1,234.50", "(12.00)", "12.00-", "12.00 DR", "-K12.00". Returns signed number or null.
+function parseNum(s) {
+  if (s == null) return null;
+  let t = String(s).trim();
+  if (!t) return null;
+  let neg = /^\(.*\)$/.test(t) || /-\s*$/.test(t) || /\bDR\b/i.test(t) || /^-/.test(t.replace(/^[A-Za-z$€£¥\s]+/, '')) || /^[A-Za-z$\s]*-/.test(t);
+  t = t.replace(/[^\d.,]/g, '');
+  if (!t || !/\d/.test(t)) return null;
+  if (/,\d{2}$/.test(t) && !/\./.test(t)) t = t.replace(/\./g, '').replace(',', '.');
+  else t = t.replace(/,/g, '');
+  const n = parseFloat(t);
+  if (!isFinite(n)) return null;
+  return neg ? -n : n;
+}
+
+/* ---------- Reading statements ---------- */
+function parseCSV(text) {
+  const first = text.split(/\r?\n/).find(l => l.trim()) || '';
+  const counts = { ',': (first.match(/,/g) || []).length, ';': (first.match(/;/g) || []).length, '\t': (first.match(/\t/g) || []).length };
+  const delim = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+      else cell += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === delim) { row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell); rows.push(row); row = []; cell = '';
+    } else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim()));
+}
+
+function rowsToTxns(rows) {
+  let h = -1;
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    const l = rows[i].map(c => c.toLowerCase());
+    if (l.some(c => /date/.test(c)) && l.some(c => /amount|debit|withdraw|value|money out|paid out/.test(c))) { h = i; break; }
+  }
+  if (h < 0) return null;
+  const H = rows[h].map(c => c.toLowerCase().trim());
+  const find = (re, not) => H.findIndex((c, i) => re.test(c) && !(not && not.includes(i)));
+  const di = find(/transaction date|txn date|trans date|posting date|^date$/) >= 0 ? find(/transaction date|txn date|trans date|posting date|^date$/) : find(/date/);
+  const deb = find(/debit|withdraw|money out|paid out|^dr$/, [di]);
+  const cre = find(/credit|deposit|money in|paid in|^cr$/, [di, deb]);
+  const amt = find(/amount|^value$|^aud$|^pgk$|^usd$/, [di, deb, cre]);
+  const typ = find(/^type$|dr\/cr|debit\/credit|^d\/c$/, [di, deb, cre, amt]);
+  let desc = find(/desc|narr|detail|particular|merchant|payee|memo|^transaction$|reference|remarks/, [di, deb, cre, amt, typ]);
+  if (desc < 0) {
+    let best = -1, bestLen = -1;
+    H.forEach((_, i) => {
+      if ([di, deb, cre, amt, typ].includes(i)) return;
+      const len = rows.slice(h + 1, h + 30).reduce((a, r) => a + String(r[i] || '').length, 0);
+      if (len > bestLen) { bestLen = len; best = i; }
+    });
+    desc = best;
+  }
+  if (di < 0 || desc < 0 || (deb < 0 && amt < 0)) return null;
+  const out = []; const signed = [];
+  for (const r of rows.slice(h + 1)) {
+    const pd = parseDateAt(r[di]);
+    if (!pd) continue;
+    const d = String(r[desc] || '').trim();
+    if (!d) continue;
+    if (deb >= 0) {
+      const a = parseNum(r[deb]);
+      if (a) out.push({ date: pd.date, desc: d, amount: Math.abs(a) });
+      continue;
+    }
+    const a = parseNum(r[amt]);
+    if (a == null || a === 0) continue;
+    if (typ >= 0 && /^\s*(CR|CREDIT|C)\s*$/i.test(r[typ] || '')) continue;
+    signed.push({ date: pd.date, desc: d, amount: a });
+  }
+  if (signed.length) {
+    const hasNeg = signed.some(t => t.amount < 0);
+    for (const t of signed) {
+      if (hasNeg && t.amount > 0) continue;
+      out.push({ date: t.date, desc: t.desc, amount: Math.abs(t.amount) });
+    }
+  }
+  return out;
+}
+
+const AMT_RE = /\(?-?[A-Z]{0,3}\$?\s?\d{1,3}(?:,\d{3})*\.\d{2}\)?-?(?:\s?(?:DR|CR)\b)?/gi;
+const CREDIT_WORDS = /\b(DEPOSIT|SALARY|PAYROLL|TRANSFER IN|TFR IN|INTEREST CREDIT|REFUND|REVERSAL|OPENING BALANCE|CLOSING BALANCE|BALANCE B\/F|BALANCE C\/F|BROUGHT FORWARD)\b/i;
+function textToTxns(text) {
+  const out = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/\t/g, '  ');
+    const pd = parseDateAt(line);
+    if (!pd) continue;
+    let rest = line.slice(pd.len);
+    const pd2 = parseDateAt(rest);
+    if (pd2) rest = rest.slice(pd2.len);
+    if (CREDIT_WORDS.test(rest)) continue;
+    const amts = [...rest.matchAll(AMT_RE)];
+    if (!amts.length) continue;
+    const tok = amts[0][0];
+    if (/CR\b/i.test(tok)) continue;
+    const a = parseNum(tok);
+    if (!a) continue;
+    const desc = rest.slice(0, amts[0].index).replace(/\s{2,}/g, ' ').trim();
+    if (!desc) continue;
+    out.push({ date: pd.date, desc, amount: Math.abs(a) });
+  }
+  return out;
+}
+
+function importText(text, label) {
+  let txns = null;
+  const looksTabular = /[,;\t]/.test(text.split(/\r?\n/)[0] || '');
+  if (looksTabular) txns = rowsToTxns(parseCSV(text));
+  if (!txns || !txns.length) txns = textToTxns(text);
+  if (!txns.length) {
+    toast('err', `Couldn't find dates and amounts in ${label}. Check that each transaction line starts with a date, or copy the statement text and paste it in the box instead.`);
+    return;
+  }
+  if (S.example) { S.txns = []; S.meta = {}; S.example = false; openRows.clear(); }
+  const seen = new Set(S.txns.map(t => `${t.date}|${t.desc}|${t.amount}`));
+  let added = 0;
+  for (const t of txns) {
+    const k = `${t.date}|${t.desc}|${t.amount}`;
+    if (seen.has(k)) continue;
+    seen.add(k); S.txns.push(t); added++;
+  }
+  save();
+  const subs = analyse();
+  const range = txns.map(t => t.date).sort();
+  toast('ok', `Read ${txns.length} payments from ${label} (${fmtDate(range[0])} to ${fmtDate(range[range.length - 1])}). ${added < txns.length ? `${txns.length - added} were already loaded. ` : ''}KaruScan now sees ${subs.length} subscription${subs.length === 1 ? '' : 's'}.`);
+  render();
+  $('review').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ---------- Finding subscriptions ---------- */
+const FEE_RE = /((INT'?L|INTERNATIONAL|FOREIGN|OVERSEAS|OFFSHORE|\bFX\b|CURRENCY|CROSS.?BORDER).{0,20}(FEE|CHG|CHARGE|COMM|COMMISSION))|((FEE|CHG|CHARGE).{0,12}(INT'?L|INTERNATIONAL|FOREIGN|OVERSEAS|\bFX\b))/;
+const PREFIX_RE = /^(POS|EFTPOS|VISA|MASTERCARD|MC|DEBIT CARD|DEBIT|CARD|PURCHASE|PUR|ONLINE|RECURRING|DD|DIRECT DEBIT|INTL|INTERNATIONAL|TXN|PMT|PAYMENT|ATM)\b[\s:\-\/]*/;
+
+function identify(desc) {
+  const u = desc.toUpperCase().replace(/\s+/g, ' ').trim();
+  for (const c of CATALOG) if (c.re.test(u)) return { key: 'c:' + c.id, cat: c };
+  let s = u; for (let i = 0; i < 4; i++) s = s.replace(PREFIX_RE, '');
+  s = s.replace(/\d[\d\-\/:.]*/g, ' ').replace(/[^A-Z&*. ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const words = s.split(' ').filter(w => w.length > 1 && !/^(US|USA|AU|AUS|GB|IE|SG|NZ|PG|PNG|CA|INC|LLC|LTD|PTY|CO)$/.test(w)).slice(0, 3);
+  return { key: 'm:' + (words.join(' ') || u.slice(0, 20)), cat: null };
+}
+function median(a) { const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+function cadenceOf(dates) {
+  if (dates.length < 2) return null;
+  const g = []; for (let i = 1; i < dates.length; i++) g.push((new Date(dates[i]) - new Date(dates[i - 1])) / DAY);
+  const m = median(g);
+  if (m >= 5 && m <= 9) return 'weekly';
+  if (m >= 25 && m <= 36) return 'monthly';
+  if (m >= 80 && m <= 100) return 'quarterly';
+  if (m >= 340 && m <= 390) return 'yearly';
+  return null;
+}
+const PER_MONTH = { weekly: 52 / 12, monthly: 1, quarterly: 1 / 3, yearly: 1 / 12 };
+const CAD_LABEL = { weekly: 'weekly', monthly: 'monthly', quarterly: 'every 3 months', yearly: 'yearly' };
+
+function analyse() {
+  const groups = new Map(); let fees = 0, feeCount = 0;
+  for (const t of S.txns) {
+    const u = t.desc.toUpperCase();
+    if (FEE_RE.test(u)) { fees += t.amount; feeCount++; continue; }
+    const id = identify(t.desc);
+    if (!groups.has(id.key)) groups.set(id.key, { key: id.key, cat: id.cat, charges: [] });
+    groups.get(id.key).charges.push(t);
+  }
+  analyse.fees = fees; analyse.feeCount = feeCount;
+  const subs = [];
+  for (const g of groups.values()) {
+    g.charges.sort((a, b) => a.date.localeCompare(b.date));
+    const dates = g.charges.map(c => c.date);
+    const amts = g.charges.map(c => c.amount);
+    const cad = cadenceOf(dates);
+    const steady = Math.max(...amts) / Math.min(...amts) <= 1.35;
+    if (!g.cat && !(cad && steady && g.charges.length >= 2)) continue;
+    const last = g.charges[g.charges.length - 1];
+    const recent = g.charges.slice(-3).map(c => c.amount);
+    const perCharge = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const billing = cad || (g.cat ? 'monthly' : 'monthly');
+    const meta = S.meta[g.key] || {};
+    const sub = {
+      key: g.key, cat: g.cat,
+      name: g.cat ? g.cat.name : titleCase(g.key.slice(2)),
+      category: g.cat ? g.cat.cat : 'Unidentified',
+      desc: last.desc, charges: g.charges, count: g.charges.length,
+      first: dates[0], last: last.date, lastAmt: last.amount, firstAmt: g.charges[0].amount,
+      perCharge, billing, billingKnown: !!cad,
+      monthly: perCharge * PER_MONTH[billing],
+      usage: meta.usage || '', status: meta.status || '', cancelledOn: meta.cancelledOn || ''
+    };
+    sub.afterCancel = sub.status === 'cancelled' && sub.cancelledOn ? g.charges.filter(c => c.date > addDays(sub.cancelledOn, 2)) : [];
+    sub.rec = recommend(sub);
+    sub.priceUp = sub.count >= 2 && sub.lastAmt > sub.firstAmt * 1.1;
+    subs.push(sub);
+  }
+  const order = { after: 0, dispute: 1, cancel: 2, review: 3, keep: 4, cancelled: 5 };
+  subs.sort((a, b) => order[a.rec] - order[b.rec] || b.monthly - a.monthly);
+  return subs;
+}
+function addDays(isoStr, n) { const d = new Date(isoStr + 'T12:00:00'); d.setDate(d.getDate() + n); return iso(d); }
+function titleCase(s) { return s.toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase()) || 'Unknown merchant'; }
+function recommend(s) {
+  if (s.status === 'cancelled') return s.afterCancel.length ? 'after' : 'cancelled';
+  if (s.status === 'keep') return 'keep';
+  if (s.usage === 'unknown') return 'dispute';
+  if (s.usage === 'old' || s.usage === 'never') return 'cancel';
+  if (s.usage === 'week' || s.usage === 'month') return 'keep';
+  return 'review';
+}
+const LEAKING = new Set(['cancel', 'dispute', 'after']);
+
+/* ---------- Letters ---------- */
+function chargeLines(s, list) {
+  return (list || s.charges).slice(-6).map(c => `  ${fmtDate(c.date)}   ${money(c.amount)}   "${c.desc}"`).join('\n');
+}
+function cancelEmail(s) {
+  const unused = s.usage === 'old' || s.usage === 'never';
+  return `Subject: Please cancel my subscription and stop all future charges
+
+Hello ${s.cat && !s.cat.via ? s.name.replace(/ \(.*\)$/, '') : ''} Support team,
+
+Please cancel my subscription with immediate effect and confirm in writing that no further charges will be made to my card.
+
+Account email: [your account email]
+Name on account: [your name]
+
+These charges appear on my card statement:
+${chargeLines(s)}
+${unused ? `
+I have not used the service in recent months. Please refund the most recent charge of ${money(s.lastAmt)} taken on ${fmtDate(s.last)}.
+` : ''}
+Please reply to confirm the cancellation date.
+
+Kind regards,
+[Your name]
+[Phone]`;
+}
+function disputeLetter(s) {
+  const list = s.rec === 'after' ? s.afterCancel : s.charges;
+  const reason = s.rec === 'after'
+    ? `I cancelled this subscription on ${fmtDate(s.cancelledOn)}, but the merchant charged my card again afterwards.`
+    : `I do not recognise these charges and did not knowingly authorise a recurring payment to this merchant.`;
+  return `To: Card Services / Disputes Team, [Your bank's name]
+Date: ${fmtDate(todayIso())}
+
+Re: Disputed recurring card charges, card ending [last 4 digits]
+
+Dear Card Services team,
+
+I am writing to dispute the following charges on my card account:
+${chargeLines(s, list)}
+
+Merchant as shown on statement: "${s.desc}"
+Total disputed: ${money(list.slice(-6).reduce((a, c) => a + c.amount, 0))}
+
+${reason}
+
+Please:
+1. Investigate and reverse (charge back) the charges listed above.
+2. Block any further payments from this merchant on my card.
+3. Advise whether my card should be cancelled and reissued.
+
+My contact details:
+Name: [Your full name]
+Account number: [Account number]
+Phone: [Mobile number]
+Email: [Email address]
+
+Signed: ______________________
+
+[Your name]`;
+}
+
+/* ---------- Rendering ---------- */
+function toast(kind, msg) {
+  const t = $('toast'); t.className = 'toast ' + kind; t.textContent = msg; t.hidden = false;
+}
+
+function render() {
+  const subs = analyse();
+  $('banner').hidden = !S.example;
+  const active = subs.filter(s => s.status !== 'cancelled' || s.rec === 'after');
+  const monthly = active.reduce((a, s) => a + s.monthly, 0);
+  const leak = subs.filter(s => LEAKING.has(s.rec)).reduce((a, s) => a + s.monthly, 0);
+  const saved = subs.filter(s => s.rec === 'cancelled').reduce((a, s) => a + s.monthly, 0);
+  const toAct = subs.filter(s => LEAKING.has(s.rec)).length;
+  $('summary').innerHTML = `
+    <div class="stat"><span class="label">Subscriptions found</span><span class="v">${subs.length}</span><span class="hint">${active.length} still charging</span></div>
+    <div class="stat"><span class="label">Costing you per month</span><span class="v">${esc(money(monthly))}</span><span class="hint">${esc(money(monthly * 12))} a year</span></div>
+    <div class="stat"><span class="label">Wasted per month</span><span class="v ${leak ? 'bad' : ''}">${esc(money(leak))}</span><span class="hint">${toAct} to cancel or dispute</span></div>
+    <div class="stat"><span class="label">${saved ? 'Saved per year so far' : 'Yearly saving if you act'}</span><span class="v ok">${esc(money((saved || leak) * 12))}</span><span class="hint">${saved ? `${subs.filter(s => s.rec === 'cancelled').length} cancelled` : 'by cancelling the red rows'}</span></div>`;
+
+  // Insights
+  const ins = [];
+  for (const s of subs.filter(s => s.rec === 'after')) ins.push(['bad', `<strong>${esc(s.name)}</strong> charged you ${esc(money(s.afterCancel.reduce((a, c) => a + c.amount, 0)))} after you cancelled on ${esc(fmtDate(s.cancelledOn))}. Ask them for a refund, and if they refuse, send the bank dispute letter.`]);
+  const unknown = subs.filter(s => s.rec === 'dispute');
+  if (unknown.length) ins.push(['bad', `${unknown.length} charge${unknown.length > 1 ? 's' : ''} you don't recognise: ${unknown.map(s => `<strong>${esc(s.name)}</strong>`).join(', ')}. Dispute ${unknown.length > 1 ? 'these' : 'it'} with your bank and consider asking for a new card.`]);
+  const unidentified = subs.filter(s => !s.cat && !s.usage && s.status !== 'cancelled');
+  if (unidentified.length) ins.push(['warn', `${unidentified.length} repeating charge${unidentified.length > 1 ? 's' : ''} KaruScan doesn't know by name (${unidentified.map(s => esc(s.name)).join(', ')}). If you don't recognise ${unidentified.length > 1 ? 'them' : 'it'}, choose “I don't recognise this charge”.`]);
+  const byCat = {};
+  for (const s of active) if (s.cat && !s.cat.via) (byCat[s.category] = byCat[s.category] || []).push(s);
+  for (const [cat, list] of Object.entries(byCat)) {
+    if (list.length >= 2 && /^AI /.test(cat)) ins.push(['info', `You pay for ${list.length} AI ${esc(cat.replace(/^AI /, ''))} tools: ${list.map(s => esc(s.name)).join(', ')}, together ${esc(money(list.reduce((a, s) => a + s.monthly, 0)))} a month. Most people only need one.`]);
+  }
+  for (const s of active.filter(s => s.priceUp)) ins.push(['warn', `<strong>${esc(s.name)}</strong> went up from ${esc(money(s.firstAmt))} to ${esc(money(s.lastAmt))} per charge.`]);
+  if (analyse.fees > 0) ins.push(['info', `Your bank also charged ${esc(money(analyse.fees))} in international transaction fees (${analyse.feeCount} fee${analyse.feeCount > 1 ? 's' : ''}). Overseas subscriptions cost more than their sticker price.`]);
+  $('insights').innerHTML = ins.map(([k, h]) => `<li class="${k}"><span class="dot"></span><span>${h}</span></li>`).join('');
+  $('insights').hidden = !ins.length;
+
+  // Filters
+  const counts = {
+    all: subs.length,
+    act: subs.filter(s => LEAKING.has(s.rec)).length,
+    review: subs.filter(s => s.rec === 'review').length,
+    keep: subs.filter(s => s.rec === 'keep').length,
+    cancelled: subs.filter(s => s.rec === 'cancelled').length
+  };
+  const F = [['all', 'All'], ['act', 'Cancel or dispute'], ['review', 'Needs your answer'], ['keep', 'Keeping'], ['cancelled', 'Cancelled']];
+  $('filters').innerHTML = F.map(([k, l]) => `<button type="button" data-filter="${k}" aria-pressed="${filter === k}">${l} <span class="count">${counts[k]}</span></button>`).join('');
+
+  const shown = subs.filter(s => filter === 'all' || (filter === 'act' ? LEAKING.has(s.rec) : s.rec === filter));
+  if (!subs.length) {
+    $('list').innerHTML = `<div class="empty">No subscriptions yet. Add a statement above, or load the example to see how it works.</div>`;
+    return;
+  }
+  if (!shown.length) { $('list').innerHTML = `<div class="empty">Nothing in this group.</div>`; return; }
+  $('list').innerHTML = shown.map(rowHtml).join('');
+}
+
+function rowHtml(s) {
+  const k = esc(s.key);
+  const open = openRows.has(s.key);
+  const recNote = {
+    keep: 'You use this',
+    review: s.usage ? 'Used 1–3 months ago. Do you still need it?' : 'Answer when you last used it',
+    cancel: 'Paying for something you don\'t use',
+    dispute: 'Possible unauthorised charge',
+    cancelled: `Cancelled ${s.cancelledOn ? fmtDate(s.cancelledOn) : ''}`,
+    after: 'Charged again after cancelling'
+  }[s.rec];
+  const charges = s.charges.slice(-8).map(c => {
+    const after = s.afterCancel.includes(c);
+    return `<span class="${after ? 'after' : ''}">${esc(fmtDate(c.date))}</span><span class="${after ? 'after' : ''}">${esc(money(c.amount))}</span>`;
+  }).join('');
+  const steps = s.cat ? s.cat.steps : [
+    'Search your email for the merchant name shown on the statement to find the company and your account',
+    'Sign in to that account and look for Settings → Billing or Subscription',
+    'If you can\'t find the company or never signed up, mark it “I don\'t recognise this charge” and send the bank dispute letter'
+  ];
+  const link = s.cat ? `<a class="btn primary" href="${esc(s.cat.url)}" target="_blank" rel="noopener noreferrer">Open ${esc(s.cat.via ? s.cat.name.replace(/^App billed through /, '') : s.name.replace(/ \(.*\)$/, ''))} billing page ↗</a>` : '';
+  return `
+  <div class="sub ${LEAKING.has(s.rec) ? 'flag-bad' : ''} ${s.rec === 'cancelled' ? 'is-cancelled' : ''}" data-key="${k}">
+    <div class="sub-main">
+      <div class="sub-name">
+        <span class="nm">${esc(s.name)} <span class="chip">${esc(s.category)}</span></span>
+        <span class="desc">${esc(s.desc)}</span>
+      </div>
+      <div class="money">
+        <span class="amt">${esc(money(s.perCharge))} <span class="muted small">${s.billingKnown ? CAD_LABEL[s.billing] : 'per charge'}</span></span>
+        <span class="small muted">${s.count} charge${s.count > 1 ? 's' : ''} · last ${esc(fmtDate(s.last))}</span>
+        ${s.billing !== 'monthly' ? `<span class="small muted">≈ ${esc(money(s.monthly))} a month</span>` : ''}
+      </div>
+      <div class="usage">
+        <label class="label" for="u-${k}">Last used</label>
+        <select id="u-${k}" data-act="usage" ${s.status === 'cancelled' ? 'disabled' : ''}>
+          ${USAGE.map(([v, l]) => `<option value="${v}" ${s.usage === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="actions">
+        <span class="pill ${s.rec}" title="${esc(recNote)}">${REC[s.rec]}</span>
+        <button type="button" data-act="toggle" aria-expanded="${open}">${s.rec === 'cancelled' || s.rec === 'keep' ? 'Details' : 'How to cancel'}</button>
+      </div>
+    </div>
+    ${open ? `
+    <div class="how">
+      <div class="col">
+        <p class="small muted">${esc(recNote)}.</p>
+        <h3>Cancel ${esc(s.name.replace(/ \(.*\)$/, ''))}</h3>
+        <ol>${steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
+        <div class="row-btns">${link}</div>
+        <div class="cancel-form">
+          ${s.status === 'cancelled'
+            ? `<span class="small">Marked cancelled on ${esc(fmtDate(s.cancelledOn))}.</span><button type="button" data-act="undo">Undo</button>`
+            : `<label class="small" for="d-${k}">Cancelled on</label>
+               <input type="date" id="d-${k}" value="${todayIso()}" max="${todayIso()}">
+               <button type="button" data-act="cancelled">Mark as cancelled</button>
+               ${s.status === 'keep' ? `<button type="button" data-act="undo">Stop keeping</button>` : `<button type="button" data-act="keep">Keep it</button>`}`}
+        </div>
+        <p class="note">After cancelling, add next month's statement. KaruScan flags any charge after the cancel date.</p>
+      </div>
+      <div class="col">
+        <span class="label">Recent charges</span>
+        <div class="charges">${charges}</div>
+        <div class="row-btns">
+          <button type="button" data-act="email">Copy cancellation email</button>
+          <button type="button" data-act="dispute">Copy bank dispute letter</button>
+        </div>
+        <textarea class="copybox" id="t-${k}" spellcheck="false" hidden readonly></textarea>
+        <p class="note" id="m-${k}" hidden></p>
+      </div>
+    </div>` : ''}
+  </div>`;
+}
+
+function setMeta(key, patch) {
+  S.meta[key] = Object.assign({}, S.meta[key] || {}, patch);
+  for (const k of Object.keys(S.meta[key])) if (S.meta[key][k] === '' || S.meta[key][k] == null) delete S.meta[key][k];
+  save(); render();
+}
+
+async function copyText(text, box, msg) {
+  box.value = text; box.hidden = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    msg.textContent = 'Copied. Paste it into your email or a document, then fill in the [brackets].';
+  } catch (e) {
+    box.focus(); box.select();
+    msg.textContent = 'Your browser blocked copying. The text is selected above: press Ctrl/⌘ + C to copy it.';
+  }
+  msg.hidden = false;
+}
+
+/* ---------- Events ---------- */
+$('list').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const row = b.closest('.sub'); const key = row.dataset.key;
+  const sub = analyse().find(s => s.key === key); if (!sub) return;
+  const act = b.dataset.act;
+  if (act === 'toggle') { openRows.has(key) ? openRows.delete(key) : openRows.add(key); render(); return; }
+  if (act === 'keep') return setMeta(key, { status: 'keep' });
+  if (act === 'undo') return setMeta(key, { status: '', cancelledOn: '' });
+  if (act === 'cancelled') {
+    const d = row.querySelector('input[type="date"]').value || todayIso();
+    return setMeta(key, { status: 'cancelled', cancelledOn: d });
+  }
+  const box = row.querySelector('textarea.copybox'); const msg = row.querySelector('p.note[id^="m-"]');
+  if (act === 'email') copyText(cancelEmail(sub), box, msg);
+  if (act === 'dispute') copyText(disputeLetter(sub), box, msg);
+});
+$('list').addEventListener('change', e => {
+  const sel = e.target.closest('select[data-act="usage"]'); if (!sel) return;
+  const key = sel.closest('.sub').dataset.key;
+  setMeta(key, { usage: sel.value });
+});
+$('filters').addEventListener('click', e => {
+  const b = e.target.closest('button[data-filter]'); if (!b) return;
+  filter = b.dataset.filter; render();
+});
+
+function readFiles(files) {
+  [...files].forEach(f => {
+    const r = new FileReader();
+    r.onload = () => importText(String(r.result || ''), f.name);
+    r.onerror = () => toast('err', `Couldn't open ${f.name}. Try downloading the statement again.`);
+    if (/\.pdf$/i.test(f.name)) { toast('err', `${f.name} is a PDF. Open it, select all the text, copy it, and paste it into the box on the right.`); return; }
+    if (/\.xlsx?$/i.test(f.name)) { toast('err', `${f.name} is an Excel file. Open it in Excel and use File → Save As → CSV, then add the CSV here.`); return; }
+    r.readAsText(f);
+  });
+}
+$('file').addEventListener('change', e => { readFiles(e.target.files); e.target.value = ''; });
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) readFiles(e.dataTransfer.files); });
+$('scanPaste').addEventListener('click', () => {
+  const t = $('pasteBox').value;
+  if (!t.trim()) { toast('err', 'The box is empty. Paste your statement text first.'); return; }
+  importText(t, 'the pasted text');
+});
+$('loadExample').addEventListener('click', () => { loadExample(); render(); toast('ok', 'Example statement loaded. Try changing “Last used” on a row, then open “How to cancel”.'); });
+$('clearExample').addEventListener('click', () => {
+  S.txns = []; S.meta = {}; S.example = false; openRows.clear(); save(); render();
+  $('toast').hidden = true; $('import').scrollIntoView({ behavior: 'smooth' });
+});
+
+$('cur').addEventListener('input', e => { S.settings.cur = e.target.value.trim(); save(); render(); });
+$('dateOrder').addEventListener('change', e => { S.settings.order = e.target.value; save(); });
+const io = $('ioBox'), ioMsg = $('ioMsg');
+$('copyReport').addEventListener('click', () => {
+  const q = v => `"${String(v).replace(/"/g, '""')}"`;
+  const lines = [['Subscription', 'Statement name', 'Category', 'Charges', 'Per charge', 'Billing', 'Per month', 'Last charged', 'Last used', 'Recommendation', 'Cancelled on'].map(q).join(',')];
+  for (const s of analyse()) lines.push([s.name, s.desc, s.category, s.count, s.perCharge.toFixed(2), s.billingKnown ? CAD_LABEL[s.billing] : 'unknown', s.monthly.toFixed(2), s.last, USAGE_LABEL[s.usage] && s.usage ? USAGE_LABEL[s.usage] : '', REC[s.rec], s.cancelledOn].map(q).join(','));
+  copyText(lines.join('\n'), io, ioMsg);
+});
+$('copyBackup').addEventListener('click', () => copyText(JSON.stringify(S), io, ioMsg));
+let restoring = false;
+$('restoreBackup').addEventListener('click', () => {
+  if (!restoring) {
+    restoring = true; io.value = ''; io.readOnly = false; io.hidden = false; io.focus();
+    ioMsg.textContent = 'Paste your backup text into the box, then press “Restore from backup” again.'; ioMsg.hidden = false; return;
+  }
+  try {
+    const d = JSON.parse(io.value);
+    if (!d || !Array.isArray(d.txns)) throw new Error('bad');
+    S = Object.assign({ txns: [], meta: {}, settings: { cur: 'K', order: 'dmy' }, example: false }, d);
+    save(); syncSettings(); render(); ioMsg.textContent = `Restored ${S.txns.length} payments.`;
+  } catch (e) { ioMsg.textContent = 'That text isn\'t a KaruScan backup. Copy the whole backup and try again.'; }
+  restoring = false;
+});
+let eraseArmed = false;
+$('eraseAll').addEventListener('click', e => {
+  if (!eraseArmed) { eraseArmed = true; e.target.textContent = 'Tap again to erase everything'; setTimeout(() => { eraseArmed = false; e.target.textContent = 'Erase all data'; }, 4000); return; }
+  eraseArmed = false; e.target.textContent = 'Erase all data';
+  S.txns = []; S.meta = {}; S.example = false; openRows.clear(); save(); render();
+  ioMsg.textContent = 'All statements and decisions erased from this browser.'; ioMsg.hidden = false; io.hidden = true;
+});
+function syncSettings() { $('cur').value = S.settings.cur; $('dateOrder').value = S.settings.order; }
+
+/* ---------- Example statement (made-up figures) ---------- */
+function loadExample() {
+  const now = new Date();
+  const ago = n => { const d = new Date(now); d.setDate(d.getDate() - n); return iso(d); };
+  const t = [];
+  const every = (desc, amt, start, n, gap = 30, fee = false) => {
+    for (let i = 0; i < n; i++) {
+      t.push({ date: ago(start + i * gap), desc, amount: amt });
+      if (fee) t.push({ date: ago(start + i * gap), desc: 'INTL TXN FEE', amount: +(amt * 0.03).toFixed(2) });
+    }
+  };
+  every('OPENAI *CHATGPT SUBSCR SAN FRANCISCO US', 84.60, 3, 6, 30, true);
+  every('CLAUDE.AI SUBSCRIPTION ANTHROPIC US', 84.60, 9, 6, 30, true);
+  every('PERPLEXITY AI INC SAN FRANCISCO', 84.60, 14, 5, 30, true);
+  every('MIDJOURNEY INC SOUTH SAN FRANC', 42.30, 20, 6, 30, true);
+  every('OTTER.AI SUBSCRIPTION MOUNTAIN VIEW', 70.50, 6, 6, 30, true);
+  every('CANVA* I04512345 SURRY HILLS', 63.40, 11, 4, 30, true);
+  every('APPLE.COM/BILL ITUNES.COM', 19.20, 17, 6, 30, false);
+  every('PADDLE.NET* AIWRITRPRO', 103.20, 25, 4, 30, true);
+  every('NETFLIX.COM', 45.00, 2, 6, 30, true);
+  t.push({ date: ago(140), desc: 'GRAMMARLY CO *PREMIUM', amount: 590.00 });
+  // Price rise on ChatGPT at the most recent charge
+  t.filter(x => x.desc.startsWith('OPENAI') ).sort((a, b) => b.date.localeCompare(a.date))[0].amount = 94.20;
+  // Everyday spending that is not a subscription
+  [['SUPERMARKET WAIGANI', 312.45], ['FUEL STATION BOROKO', 180.00], ['PHARMACY TOWN', 46.90], ['MOBILE TOP UP', 30.00], ['RESTAURANT ELLA BEACH', 128.00], ['HARDWARE GEREHU', 254.10]]
+    .forEach(([d, a], i) => { for (let k = 0; k < 6; k++) t.push({ date: ago(4 + i * 3 + k * 27), desc: d, amount: +(a * (0.7 + ((k * 7 + i) % 6) / 10)).toFixed(2) }); });
+  S.txns = t; S.example = true; openRows.clear();
+  S.meta = {
+    'c:chatgpt': { usage: 'week' }, 'c:claude': { usage: 'week' }, 'c:perplexity': { usage: 'old' },
+    'c:midjourney': { usage: 'never' }, 'c:otter': { usage: 'quarter' }, 'c:canva': { usage: 'month' },
+    'c:paddle': { usage: 'unknown' }, 'c:netflix': { usage: 'month' }, 'c:grammarly': { usage: 'old' }
+  };
+  openRows.add('c:paddle');
+  save();
+}
+
+/* ---------- Start ---------- */
+if (!load() || (!S.txns.length && !Object.keys(S.meta).length)) loadExample();
+syncSettings();
+render();
+})();
+</script>
+</body>
+</html>
