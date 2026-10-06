@@ -4,7 +4,7 @@
 
 KaruScan finds the AI tools and app subscriptions charging your bank card, shows which ones you don't use or don't recognise, and helps you cancel them.
 
-Open `karuscan/index.html` in any web browser (double-click it). It has no install, no account and no server. Your statement is read inside the browser and never uploaded.
+Open `karuscan/index.html` in any web browser (keep the `icons` folder next to it) (double-click it). It has no install, no account and no server. Your statement is read inside the browser and never uploaded.
 
 ### How to use it
 
