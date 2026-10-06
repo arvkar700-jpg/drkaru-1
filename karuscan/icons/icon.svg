@@ -1,12 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="KaruScan">
-  <rect width="512" height="512" rx="112" fill="#1F5A6E"/>
-  <g transform="rotate(-8 236 242)">
-    <rect x="76" y="140" width="300" height="196" rx="26" fill="#F1F4EF"/>
-    <rect x="76" y="180" width="300" height="38" fill="#17201C"/>
-    <rect x="106" y="250" width="54" height="40" rx="8" fill="#D9A441"/>
-    <rect x="176" y="262" width="110" height="14" rx="7" fill="#9AA69F"/>
+  <defs>
+    <clipPath id="tile"><rect width="512" height="512" rx="112"/></clipPath>
+    <path id="star" d="M0,-1 L0.2245,-0.309 L0.951,-0.309 L0.3633,0.118 L0.5878,0.809 L0,0.382 L-0.5878,0.809 L-0.3633,0.118 L-0.951,-0.309 L-0.2245,-0.309 Z" fill="#FFFFFF"/>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="512" height="512" fill="#CE1126"/>
+    <polygon points="0,0 0,512 512,512" fill="#000000"/>
+    <use href="#star" transform="translate(74 360) scale(17)"/>
+    <use href="#star" transform="translate(132 412) scale(17)"/>
+    <use href="#star" transform="translate(70 458) scale(17)"/>
+    <use href="#star" transform="translate(32 404) scale(13)"/>
+    <use href="#star" transform="translate(98 412) scale(8)"/>
   </g>
-  <circle cx="320" cy="298" r="92" fill="#1F5A6E" stroke="#F1F4EF" stroke-width="30"/>
-  <path d="M286 264 L354 332 M354 264 L286 332" stroke="#F2867A" stroke-width="26" stroke-linecap="round"/>
-  <path d="M392 370 L446 424" stroke="#F1F4EF" stroke-width="44" stroke-linecap="round"/>
+  <g transform="rotate(-8 236 242)">
+    <rect x="76" y="140" width="300" height="196" rx="26" fill="#F7F5EF"/>
+    <rect x="76" y="180" width="300" height="38" fill="#000000"/>
+    <rect x="106" y="250" width="54" height="40" rx="8" fill="#FCD116"/>
+    <rect x="176" y="262" width="110" height="14" rx="7" fill="#9A9A92"/>
+  </g>
+  <circle cx="320" cy="298" r="92" fill="#FFFFFF" stroke="#FCD116" stroke-width="30"/>
+  <path d="M286 264 L354 332 M354 264 L286 332" stroke="#CE1126" stroke-width="26" stroke-linecap="round"/>
+  <path d="M392 370 L446 424" stroke="#FCD116" stroke-width="44" stroke-linecap="round"/>
 </svg>
