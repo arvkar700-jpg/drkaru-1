@@ -7,9 +7,6 @@
 <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 /* Layout: one working column (max 1080px). Summary strip → import → review list → how-to. Rows, not cards. */
 :root {
@@ -66,6 +63,7 @@ button, .btn {
   border: 1px solid var(--line); background: var(--surface); color: var(--ink);
   padding: 8px 14px; border-radius: 8px; font-weight: 500; font-size: 0.9rem; line-height: 1.2;
 }
+@media (max-width: 760px) { input, select, textarea, .paste textarea, .copybox { font-size: 16px !important; } button, .btn { min-height: 44px; } .sub-main { grid-template-columns: minmax(0, 1fr); } .actions { flex-wrap: wrap; } }
 button:hover, .btn:hover { border-color: var(--accent); }
 button.primary, .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 button.danger { color: var(--bad); }
@@ -183,6 +181,8 @@ details.tools .inner { display: flex; flex-direction: column; gap: 12px; padding
 .settings label { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
 .settings input[type="text"] { width: 70px; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 8px; }
 footer { color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--line); padding-top: 16px; }
+fieldset { min-width: 0; width: 100%; overflow-wrap: anywhere; }
+@media (max-width: 760px) { .sub-main { grid-template-columns: minmax(0, 1fr); } .settings label { flex-wrap: wrap; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -211,14 +211,21 @@ footer { color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--li
   <section id="import">
     <div class="sec-head">
       <h2><span class="n">1</span>Add a bank or card statement</h2>
-      <p class="muted small">Add several months for best results. Recurring charges need at least two months to show up.</p>
+      <p class="muted small">Add several months for best results. Recognised vendors are only candidates; confirm the subscription and billing period.</p>
     </div>
+    <div class="settings">
+      <label>Statement currency <input id="importCur" type="text" maxlength="4" value="K"></label>
+      <label>Signed CSV debits are <select id="debitSign"><option value="negative">Negative amounts</option><option value="positive">Positive amounts</option></select></label>
+      <label>Dates <select id="importOrder"><option value="dmy">day / month / year</option><option value="mdy">month / day / year</option></select></label>
+    </div>
+    <p class="note">Import one account and currency per workspace. Separate debit columns or DR/CR indicators take precedence over the signed amount setting. Check the preview before adding payments.</p>
+    <div id="preview" hidden><h3>Check imported payments</h3><p id="previewInfo"></p><pre id="previewRows" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre><button id="confirmImport" type="button">Add these payments</button> <button id="cancelImport" type="button">Discard preview</button></div>
     <div class="import">
       <div class="drop" id="drop">
         <h3>Upload a CSV export</h3>
         <p class="muted small">Download your transactions as CSV from internet banking (most banks offer “Export” or “Download” on the transaction history page), then choose the file or drop it here.</p>
         <div class="row-btns">
-          <label class="btn primary" for="file">Choose statement file</label>
+          <button class="primary" type="button" id="chooseFile">Choose statement file</button>
           <input id="file" type="file" accept=".csv,.txt,text/csv,text/plain" multiple hidden>
           <button type="button" id="loadExample">Load example</button>
         </div>
@@ -230,13 +237,13 @@ footer { color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--li
         <div class="row-btns"><button type="button" class="primary" id="scanPaste">Scan pasted text</button></div>
       </div>
     </div>
-    <div id="toast" class="toast" hidden></div>
+    <div id="toast" class="toast" role="status" hidden></div>
   </section>
 
   <section id="review">
     <div class="sec-head">
       <h2><span class="n">2</span>Review each subscription</h2>
-      <p class="muted small">Tell KaruScan when you last used each one. It recommends what to keep, cancel or dispute.</p>
+      <p class="muted small">Tell KaruScan when you last used each one. Review candidates before deciding what to keep, cancel or investigate.</p>
     </div>
     <div class="filters" id="filters" role="group" aria-label="Filter subscriptions"></div>
     <div class="list" id="list"></div>
@@ -275,7 +282,7 @@ footer { color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--li
         </div>
         <textarea id="ioBox" class="copybox" spellcheck="false" hidden></textarea>
         <p id="ioMsg" class="note" hidden></p>
-        <p class="note">KaruScan saves your subscriptions and decisions in this browser only. Use “Copy backup” and keep the text somewhere safe if you want to move to another device.</p>
+        <p class="note">KaruScan stores all imported payments and decisions unencrypted in this browser. Anyone with access to this browser profile, or scripts on the same website origin, may read them. Backups and copied text contain financial data. Storage can be cleared by the browser; export a backup before relying on saved decisions. Use “Copy backup” and keep the text somewhere safe if you want to move to another device.</p>
       </div>
     </details>
   </section>
@@ -386,28 +393,72 @@ const USAGE = [
 ];
 const USAGE_LABEL = Object.fromEntries(USAGE);
 const REC = {
-  keep: 'Keep', review: 'Review', cancel: 'Cancel this', dispute: 'Dispute with bank',
-  cancelled: 'Cancelled', after: 'Charged after cancelling'
+  keep: 'Keep', review: 'Review', cancel: 'Consider cancelling', dispute: 'Investigate with bank',
+  cancelled: 'Cancelled', after: 'Charged after cancelling', excluded: 'Not a subscription'
 };
 
 /* ---------- State ---------- */
 const STORE_KEY = 'karuscan.v1';
 let S = { txns: [], meta: {}, settings: { cur: 'K', order: 'dmy' }, example: false };
 let filter = 'all';
+let pendingImport = null;
+let storageError = false;
 const openRows = new Set();
 
+function validateState(d) {
+  if (!d || !Array.isArray(d.txns) || d.txns.length > 50000 || !d.settings ||
+      typeof d.settings.cur !== 'string' || d.settings.cur.length > 4 ||
+      !['dmy', 'mdy'].includes(d.settings.order) || !d.meta || typeof d.meta !== 'object' || Array.isArray(d.meta) ||
+      (d.settings.sign && !['negative','positive'].includes(d.settings.sign))) throw new Error('Invalid backup');
+  const txns = d.txns.map(t => {
+    if (!t || typeof t.desc !== 'string' || t.desc.length > 2000 || !t.desc.trim() ||
+        typeof t.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(t.date) ||
+        !Number.isFinite(t.amount) || t.amount <= 0 || !Number.isFinite(Date.parse(t.date)) ||
+        new Date(t.date).toISOString().slice(0,10) !== t.date) throw new Error('Invalid payment');
+    return {date:t.date, desc:t.desc, amount:t.amount};
+  });
+  const meta = Object.create(null);
+  for (const [key, v] of Object.entries(d.meta)) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('Invalid decision');
+    if (v.usage && !USAGE.some(([u]) => u === v.usage)) throw new Error('Invalid usage');
+    if (v.status && !['keep','cancelled','excluded'].includes(v.status)) throw new Error('Invalid status');
+    if (v.billing && !['weekly','monthly','quarterly','yearly'].includes(v.billing)) throw new Error('Invalid cadence');
+    if (v.cancelledOn && (!/^\d{4}-\d{2}-\d{2}$/.test(v.cancelledOn) || !Number.isFinite(Date.parse(v.cancelledOn)) || new Date(v.cancelledOn).toISOString().slice(0,10) !== v.cancelledOn || v.cancelledOn > todayIso())) throw new Error('Invalid cancel date');
+    meta[key] = {usage:v.usage || '',status:v.status || '',billing:v.billing || '',cancelledOn:v.cancelledOn || ''};
+  }
+  return {txns, meta, settings:{cur:d.settings.cur,order:d.settings.order,sign:d.settings.sign || 'negative'}, example:d.example === true};
+}
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (raw) {
-      const d = JSON.parse(raw);
-      if (d && Array.isArray(d.txns)) { S = Object.assign(S, d); return true; }
-    }
-  } catch (e) { /* storage unavailable */ }
+    if (raw) { S = validateState(JSON.parse(raw)); return true; }
+  } catch (e) { storageError = true; }
   return false;
 }
 function save() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); storageError = false; return true; }
+  catch (e) { storageError = true; toast('err', 'Browser storage failed. Copy a backup before closing this page.'); return false; }
+}
+
+// Retain old decisions only where the former vendor group maps to one unambiguous descriptor.
+function migrateDecisions() {
+  const keys = new Map();
+  for (const t of S.txns) {
+    const id = identify(t.desc);
+    if (!id.cat) continue;
+    if (id.cat.via) id.key += ':' + t.amount.toFixed(2);
+    const old = 'c:' + id.cat.id;
+    if (!keys.has(old)) keys.set(old, new Set());
+    keys.get(old).add(id.key);
+  }
+  for (const [old, targets] of keys) {
+    if (!S.meta[old] || targets.size !== 1) continue;
+    const next = [...targets][0];
+    // An opaque reseller group cannot prove which subscription was cancelled.
+    if (CAT_BY_ID[old.slice(2)].via) continue;
+    if (!S.meta[next]) S.meta[next] = S.meta[old];
+    delete S.meta[old];
+  }
 }
 
 /* ---------- Helpers ---------- */
@@ -457,9 +508,9 @@ function parseNum(s) {
   let neg = /^\(.*\)$/.test(t) || /-\s*$/.test(t) || /\bDR\b/i.test(t) || /^-/.test(t.replace(/^[A-Za-z$€£¥\s]+/, '')) || /^[A-Za-z$\s]*-/.test(t);
   t = t.replace(/[^\d.,]/g, '');
   if (!t || !/\d/.test(t)) return null;
-  if (/,\d{2}$/.test(t) && !/\./.test(t)) t = t.replace(/\./g, '').replace(',', '.');
+  if (/,\d{2}$/.test(t)) t = t.replace(/\./g, '').replace(',', '.');
   else t = t.replace(/,/g, '');
-  const n = parseFloat(t);
+  const n = Number(t);
   if (!isFinite(n)) return null;
   return neg ? -n : n;
 }
@@ -496,10 +547,11 @@ function rowsToTxns(rows) {
   const H = rows[h].map(c => c.toLowerCase().trim());
   const find = (re, not) => H.findIndex((c, i) => re.test(c) && !(not && not.includes(i)));
   const di = find(/transaction date|txn date|trans date|posting date|^date$/) >= 0 ? find(/transaction date|txn date|trans date|posting date|^date$/) : find(/date/);
-  const deb = find(/debit|withdraw|money out|paid out|^dr$/, [di]);
-  const cre = find(/credit|deposit|money in|paid in|^cr$/, [di, deb]);
+  const typeColumn = find(/^type$|dr\/cr|debit\/credit|^d\/c$/);
+  const deb = find(/debit|withdraw|money out|paid out|^dr$/, [di, typeColumn]);
+  const cre = find(/credit|deposit|money in|paid in|^cr$/, [di, deb, typeColumn]);
   const amt = find(/amount|^value$|^aud$|^pgk$|^usd$/, [di, deb, cre]);
-  const typ = find(/^type$|dr\/cr|debit\/credit|^d\/c$/, [di, deb, cre, amt]);
+  const typ = typeColumn;
   let desc = find(/desc|narr|detail|particular|merchant|payee|memo|^transaction$|reference|remarks/, [di, deb, cre, amt, typ]);
   if (desc < 0) {
     let best = -1, bestLen = -1;
@@ -524,20 +576,22 @@ function rowsToTxns(rows) {
     }
     const a = parseNum(r[amt]);
     if (a == null || a === 0) continue;
-    if (typ >= 0 && /^\s*(CR|CREDIT|C)\s*$/i.test(r[typ] || '')) continue;
+    const kind = typ >= 0 ? String(r[typ] || '').trim().toUpperCase() : '';
+    if (/^(CR|CREDIT|C)$/.test(kind) || /\bCR\b/i.test(r[amt])) continue;
+    if (/^(DR|DEBIT|D)$/.test(kind) || /\bDR\b/i.test(r[amt])) { out.push({date:pd.date, desc:d, amount:Math.abs(a)}); continue; }
     signed.push({ date: pd.date, desc: d, amount: a });
   }
   if (signed.length) {
-    const hasNeg = signed.some(t => t.amount < 0);
+    const positive = S.settings.sign === 'positive';
     for (const t of signed) {
-      if (hasNeg && t.amount > 0) continue;
+      if (positive ? t.amount < 0 : t.amount > 0) continue;
       out.push({ date: t.date, desc: t.desc, amount: Math.abs(t.amount) });
     }
   }
   return out;
 }
 
-const AMT_RE = /\(?-?[A-Z]{0,3}\$?\s?\d{1,3}(?:,\d{3})*\.\d{2}\)?-?(?:\s?(?:DR|CR)\b)?/gi;
+const AMT_RE = /(?<![A-Z\d.,])\(?-?(?:(?:PGK|AUD|USD|NZD|EUR|GBP|K)\s*|[$€£¥]\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)\.\d{2}(?![\d.,])\)?-?(?:\s?(?:DR|CR)\b)?/gi;
 const CREDIT_WORDS = /\b(DEPOSIT|SALARY|PAYROLL|TRANSFER IN|TFR IN|INTEREST CREDIT|REFUND|REVERSAL|OPENING BALANCE|CLOSING BALANCE|BALANCE B\/F|BALANCE C\/F|BROUGHT FORWARD)\b/i;
 function textToTxns(text) {
   const out = [];
@@ -563,28 +617,43 @@ function textToTxns(text) {
 }
 
 function importText(text, label) {
+  if (text.length > 5000000) return toast('err', 'Statement too large. Import fewer than 5 MB at a time.');
+  if (pendingImport) return toast('err', 'Add or discard the current preview before importing another file.');
+  const cur = $('importCur').value.trim();
+  if (!cur || (S.txns.length && !S.example && cur !== S.settings.cur)) return toast('err', 'Use the existing workspace currency, or back up and erase it before importing a different currency.');
+  S.settings.order = $('importOrder').value; S.settings.sign = $('debitSign').value;
   let txns = null;
   const looksTabular = /[,;\t]/.test(text.split(/\r?\n/)[0] || '');
   if (looksTabular) txns = rowsToTxns(parseCSV(text));
-  if (!txns || !txns.length) txns = textToTxns(text);
+  if (txns === null) txns = textToTxns(text);
   if (!txns.length) {
     toast('err', `Couldn't find dates and amounts in ${label}. Check that each transaction line starts with a date, or copy the statement text and paste it in the box instead.`);
     return;
   }
+  if (txns.length + (S.example ? 0 : S.txns.length) > 50000 || txns.some(t=>t.desc.length > 2000)) return toast('err', 'Too many payments or an unsupported description. Use a smaller export.');
+  pendingImport = {txns, label, cur};
+  $('previewInfo').textContent = `Parsed ${txns.length} debit payments from ${label}. Credits, invalid dates and unsupported rows may have been skipped. Compare these dates, descriptions and amounts with the original. Only the first 100 payments are displayed.`;
+  $('previewRows').textContent = txns.slice(0,100).map(t => `${t.date}  ${t.desc}  ${cur} ${t.amount.toFixed(2)}`).join('\n');
+  $('preview').hidden = false;
+}
+function commitImport() {
+  if (!pendingImport) return;
+  const {txns, label, cur} = pendingImport;
   if (S.example) { S.txns = []; S.meta = {}; S.example = false; openRows.clear(); }
-  const seen = new Set(S.txns.map(t => `${t.date}|${t.desc}|${t.amount}`));
+  // Match multiplicities across imports, retaining two real identical payments in one statement.
+  const counts = new Map(); const encountered = new Map();
+  const keyOf = t => JSON.stringify([t.date,t.desc,t.amount]);
+  for (const t of S.txns) { const k=keyOf(t); counts.set(k,(counts.get(k)||0)+1); }
   let added = 0;
   for (const t of txns) {
-    const k = `${t.date}|${t.desc}|${t.amount}`;
-    if (seen.has(k)) continue;
-    seen.add(k); S.txns.push(t); added++;
+    const k=keyOf(t), n=(encountered.get(k)||0)+1; encountered.set(k,n);
+    if (n <= (counts.get(k)||0)) continue;
+    S.txns.push(t); added++;
   }
-  save();
-  const subs = analyse();
-  const range = txns.map(t => t.date).sort();
-  toast('ok', `Read ${txns.length} payments from ${label} (${fmtDate(range[0])} to ${fmtDate(range[range.length - 1])}). ${added < txns.length ? `${txns.length - added} were already loaded. ` : ''}KaruScan now sees ${subs.length} subscription${subs.length === 1 ? '' : 's'}.`);
-  render();
-  $('review').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  S.settings.cur = cur;
+  pendingImport = null; $('preview').hidden = true; $('previewRows').textContent = ''; $('previewInfo').textContent = ''; $('pasteBox').value = '';
+  save(); syncSettings(); render();
+  toast(storageError ? 'err' : 'ok', storageError ? 'Payments loaded in memory, but browser storage failed. Copy a backup before closing.' : `Added ${added} payments from ${label}; ${txns.length-added} matched existing payments. Review possible subscriptions below.`);
 }
 
 /* ---------- Finding subscriptions ---------- */
@@ -593,17 +662,16 @@ const PREFIX_RE = /^(POS|EFTPOS|VISA|MASTERCARD|MC|DEBIT CARD|DEBIT|CARD|PURCHAS
 
 function identify(desc) {
   const u = desc.toUpperCase().replace(/\s+/g, ' ').trim();
-  for (const c of CATALOG) if (c.re.test(u)) return { key: 'c:' + c.id, cat: c };
-  let s = u; for (let i = 0; i < 4; i++) s = s.replace(PREFIX_RE, '');
-  s = s.replace(/\d[\d\-\/:.]*/g, ' ').replace(/[^A-Z&*. ]/g, ' ').replace(/\s+/g, ' ').trim();
-  const words = s.split(' ').filter(w => w.length > 1 && !/^(US|USA|AU|AUS|GB|IE|SG|NZ|PG|PNG|CA|INC|LLC|LTD|PTY|CO)$/.test(w)).slice(0, 3);
-  return { key: 'm:' + (words.join(' ') || u.slice(0, 20)), cat: null };
+  for (const c of CATALOG) if (c.re.test(u)) return { key: 'c:' + c.id + ':' + u, cat: c };
+  // Preserve the whole descriptor: truncating to three words can merge unrelated merchants.
+  return { key: 'm:' + u, cat: null };
 }
 function median(a) { const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
 function cadenceOf(dates) {
   if (dates.length < 2) return null;
   const g = []; for (let i = 1; i < dates.length; i++) g.push((new Date(dates[i]) - new Date(dates[i - 1])) / DAY);
   const m = median(g);
+  if (g.some(v => v <= 0 || Math.abs(v-m) > Math.max(3, m*0.12))) return null;
   if (m >= 5 && m <= 9) return 'weekly';
   if (m >= 25 && m <= 36) return 'monthly';
   if (m >= 80 && m <= 100) return 'quarterly';
@@ -615,10 +683,13 @@ const CAD_LABEL = { weekly: 'weekly', monthly: 'monthly', quarterly: 'every 3 mo
 
 function analyse() {
   const groups = new Map(); let fees = 0, feeCount = 0;
+  const statementEnd = S.txns.reduce((d,t) => t.date > d ? t.date : d, '');
   for (const t of S.txns) {
     const u = t.desc.toUpperCase();
     if (FEE_RE.test(u)) { fees += t.amount; feeCount++; continue; }
     const id = identify(t.desc);
+    // Resellers hide the app name: keep distinct descriptions and price streams separate.
+    if (id.cat && id.cat.via) id.key += ":" + t.amount.toFixed(2);
     if (!groups.has(id.key)) groups.set(id.key, { key: id.key, cat: id.cat, charges: [] });
     groups.get(id.key).charges.push(t);
   }
@@ -634,16 +705,18 @@ function analyse() {
     const last = g.charges[g.charges.length - 1];
     const recent = g.charges.slice(-3).map(c => c.amount);
     const perCharge = recent.reduce((a, b) => a + b, 0) / recent.length;
-    const billing = cad || (g.cat ? 'monthly' : 'monthly');
     const meta = S.meta[g.key] || {};
+    const billing = meta.billing || cad;
+    const interval = {weekly:7,monthly:31,quarterly:92,yearly:366}[billing];
+    const stale = !!interval && (Date.parse(statementEnd)-Date.parse(last.date))/DAY > interval*1.5;
     const sub = {
       key: g.key, cat: g.cat,
       name: g.cat ? g.cat.name : titleCase(g.key.slice(2)),
       category: g.cat ? g.cat.cat : 'Unidentified',
       desc: last.desc, charges: g.charges, count: g.charges.length,
       first: dates[0], last: last.date, lastAmt: last.amount, firstAmt: g.charges[0].amount,
-      perCharge, billing, billingKnown: !!cad,
-      monthly: perCharge * PER_MONTH[billing],
+      perCharge, billing, billingKnown: !!billing, stale,
+      monthly: billing ? perCharge * PER_MONTH[billing] : 0,
       usage: meta.usage || '', status: meta.status || '', cancelledOn: meta.cancelledOn || ''
     };
     sub.afterCancel = sub.status === 'cancelled' && sub.cancelledOn ? g.charges.filter(c => c.date > addDays(sub.cancelledOn, 2)) : [];
@@ -651,13 +724,14 @@ function analyse() {
     sub.priceUp = sub.count >= 2 && sub.lastAmt > sub.firstAmt * 1.1;
     subs.push(sub);
   }
-  const order = { after: 0, dispute: 1, cancel: 2, review: 3, keep: 4, cancelled: 5 };
+  const order = { after: 0, dispute: 1, cancel: 2, review: 3, keep: 4, cancelled: 5, excluded:6 };
   subs.sort((a, b) => order[a.rec] - order[b.rec] || b.monthly - a.monthly);
   return subs;
 }
 function addDays(isoStr, n) { const d = new Date(isoStr + 'T12:00:00'); d.setDate(d.getDate() + n); return iso(d); }
 function titleCase(s) { return s.toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase()) || 'Unknown merchant'; }
 function recommend(s) {
+  if (s.status === 'excluded') return 'excluded';
   if (s.status === 'cancelled') return s.afterCancel.length ? 'after' : 'cancelled';
   if (s.status === 'keep') return 'keep';
   if (s.usage === 'unknown') return 'dispute';
@@ -669,7 +743,7 @@ const LEAKING = new Set(['cancel', 'dispute', 'after']);
 
 /* ---------- Letters ---------- */
 function chargeLines(s, list) {
-  return (list || s.charges).slice(-6).map(c => `  ${fmtDate(c.date)}   ${money(c.amount)}   "${c.desc}"`).join('\n');
+  return (list || s.charges.slice(-6)).map(c => `  ${fmtDate(c.date)}   ${money(c.amount)}   "${c.desc}"`).join('\n');
 }
 function cancelEmail(s) {
   const unused = s.usage === 'old' || s.usage === 'never';
@@ -693,11 +767,12 @@ Kind regards,
 [Your name]
 [Phone]`;
 }
-function disputeLetter(s) {
-  const list = s.rec === 'after' ? s.afterCancel : s.charges;
+function disputeLetter(s, selected) {
+  const list = selected || [];
+  if (!list.length) return '';
   const reason = s.rec === 'after'
-    ? `I cancelled this subscription on ${fmtDate(s.cancelledOn)}, but the merchant charged my card again afterwards.`
-    : `I do not recognise these charges and did not knowingly authorise a recurring payment to this merchant.`;
+    ? `I recorded cancellation on ${fmtDate(s.cancelledOn)}. Please investigate the selected later payments and whether they were due under the billing terms.`
+    : `I do not recognise the selected charges. Please help identify the merchant and investigate whether these payments were authorised.`;
   return `To: Card Services / Disputes Team, [Your bank's name]
 Date: ${fmtDate(todayIso())}
 
@@ -709,12 +784,12 @@ I am writing to dispute the following charges on my card account:
 ${chargeLines(s, list)}
 
 Merchant as shown on statement: "${s.desc}"
-Total disputed: ${money(list.slice(-6).reduce((a, c) => a + c.amount, 0))}
+Total disputed: ${money(list.reduce((a, c) => a + c.amount, 0))}
 
 ${reason}
 
 Please:
-1. Investigate and reverse (charge back) the charges listed above.
+1. Investigate the selected charges and advise whether a reversal is appropriate.
 2. Block any further payments from this merchant on my card.
 3. Advise whether my card should be cancelled and reissued.
 
@@ -737,31 +812,37 @@ function toast(kind, msg) {
 function render() {
   const subs = analyse();
   $('banner').hidden = !S.example;
-  const active = subs.filter(s => s.status !== 'cancelled' || s.rec === 'after');
+  const active = subs.filter(s => s.rec !== 'excluded' && !s.stale && (s.status !== 'cancelled' || s.rec === 'after'));
   const monthly = active.reduce((a, s) => a + s.monthly, 0);
-  const leak = subs.filter(s => LEAKING.has(s.rec)).reduce((a, s) => a + s.monthly, 0);
-  const saved = subs.filter(s => s.rec === 'cancelled').reduce((a, s) => a + s.monthly, 0);
+  const leak = active.filter(s => LEAKING.has(s.rec)).reduce((a, s) => a + s.monthly, 0);
+  const saved = subs.filter(s => s.rec === 'cancelled' && !s.stale).reduce((a, s) => a + s.monthly, 0);
   const toAct = subs.filter(s => LEAKING.has(s.rec)).length;
   $('summary').innerHTML = `
-    <div class="stat"><span class="label">Subscriptions found</span><span class="v">${subs.length}</span><span class="hint">${active.length} still charging</span></div>
-    <div class="stat"><span class="label">Costing you per month</span><span class="v">${esc(money(monthly))}</span><span class="hint">${esc(money(monthly * 12))} a year</span></div>
-    <div class="stat"><span class="label">Wasted per month</span><span class="v ${leak ? 'bad' : ''}">${esc(money(leak))}</span><span class="hint">${toAct} to cancel or dispute</span></div>
-    <div class="stat"><span class="label">${saved ? 'Saved per year so far' : 'Yearly saving if you act'}</span><span class="v ok">${esc(money((saved || leak) * 12))}</span><span class="hint">${saved ? `${subs.filter(s => s.rec === 'cancelled').length} cancelled` : 'by cancelling the red rows'}</span></div>`;
+    <div class="stat"><span class="label">Possible subscriptions</span><span class="v">${subs.length}</span><span class="hint">${active.length} recent candidates; verify in your account</span></div>
+    <div class="stat"><span class="label">Estimated monthly cost</span><span class="v">${esc(money(monthly))}</span><span class="hint">${esc(money(monthly * 12))} a year</span></div>
+    <div class="stat"><span class="label">Potential monthly reduction</span><span class="v ${leak ? 'bad' : ''}">${esc(money(leak))}</span><span class="hint">${toAct} to cancel or dispute</span></div>
+    <div class="stat"><span class="label">Potential annual savings</span><span class="v ok">${esc(money((saved + leak) * 12))}</span><span class="hint">estimates, not verified savings</span></div>`;
 
   // Insights
   const ins = [];
-  for (const s of subs.filter(s => s.rec === 'after')) ins.push(['bad', `<strong>${esc(s.name)}</strong> charged you ${esc(money(s.afterCancel.reduce((a, c) => a + c.amount, 0)))} after you cancelled on ${esc(fmtDate(s.cancelledOn))}. Ask them for a refund, and if they refuse, send the bank dispute letter.`]);
+  const candidateKeys = new Set(subs.map(s=>s.key));
+  if (Object.keys(S.meta).some(k=>!candidateKeys.has(k))) ins.push(['warn', 'Some saved decisions, possibly from an older version, no longer match a current billing stream. They are retained in your backup but are not automatically applied. Review those candidates again.']);
+  const unresolved = subs.filter(s => !s.billingKnown && s.rec !== 'excluded');
+  if (unresolved.length) ins.push(['warn', `${unresolved.length} candidates have unknown billing periods and are excluded from cost totals. Confirm a period in Details.`]);
+  if (subs.some(s=>s.stale)) ins.push(['warn', 'Some charges are old relative to the latest imported payment and are excluded from current estimates. Statement history does not prove a subscription is active.']);
+  if (storageError) ins.push(['bad', 'Browser storage is unavailable or saved data could not be read. Copy a backup; do not rely on persistence.']);
+  for (const s of subs.filter(s => s.rec === 'after')) ins.push(['warn', `<strong>${esc(s.name)}</strong> has ${esc(money(s.afterCancel.reduce((a, c) => a + c.amount, 0)))} in payments more than two days after your recorded cancellation on ${esc(fmtDate(s.cancelledOn))}. Check posting delays, billing terms and whether another subscription shares this descriptor before requesting an investigation.`]);
   const unknown = subs.filter(s => s.rec === 'dispute');
-  if (unknown.length) ins.push(['bad', `${unknown.length} charge${unknown.length > 1 ? 's' : ''} you don't recognise: ${unknown.map(s => `<strong>${esc(s.name)}</strong>`).join(', ')}. Dispute ${unknown.length > 1 ? 'these' : 'it'} with your bank and consider asking for a new card.`]);
+  if (unknown.length) ins.push(['warn', `${unknown.length} candidate${unknown.length > 1 ? 's' : ''} you don't recognise: ${unknown.map(s => `<strong>${esc(s.name)}</strong>`).join(', ')}. Check receipts and shared accounts, then select relevant payments for a bank investigation if still unclear.`]);
   const unidentified = subs.filter(s => !s.cat && !s.usage && s.status !== 'cancelled');
   if (unidentified.length) ins.push(['warn', `${unidentified.length} repeating charge${unidentified.length > 1 ? 's' : ''} KaruScan doesn't know by name (${unidentified.map(s => esc(s.name)).join(', ')}). If you don't recognise ${unidentified.length > 1 ? 'them' : 'it'}, choose “I don't recognise this charge”.`]);
   const byCat = {};
   for (const s of active) if (s.cat && !s.cat.via) (byCat[s.category] = byCat[s.category] || []).push(s);
   for (const [cat, list] of Object.entries(byCat)) {
-    if (list.length >= 2 && /^AI /.test(cat)) ins.push(['info', `You pay for ${list.length} AI ${esc(cat.replace(/^AI /, ''))} tools: ${list.map(s => esc(s.name)).join(', ')}, together ${esc(money(list.reduce((a, s) => a + s.monthly, 0)))} a month. Most people only need one.`]);
+    if (list.length >= 2 && /^AI /.test(cat)) ins.push(['info', `You pay for ${list.length} AI ${esc(cat.replace(/^AI /, ''))} tools: ${list.map(s => esc(s.name)).join(', ')}, together ${esc(money(list.reduce((a, s) => a + s.monthly, 0)))} a month. Consider which capabilities you need before changing plans.`]);
   }
-  for (const s of active.filter(s => s.priceUp)) ins.push(['warn', `<strong>${esc(s.name)}</strong> went up from ${esc(money(s.firstAmt))} to ${esc(money(s.lastAmt))} per charge.`]);
-  if (analyse.fees > 0) ins.push(['info', `Your bank also charged ${esc(money(analyse.fees))} in international transaction fees (${analyse.feeCount} fee${analyse.feeCount > 1 ? 's' : ''}). Overseas subscriptions cost more than their sticker price.`]);
+  for (const s of active.filter(s => s.priceUp)) ins.push(['warn', `<strong>${esc(s.name)}</strong> changed from ${esc(money(s.firstAmt))} to ${esc(money(s.lastAmt))} per charge; currency conversion or plan changes may explain this.`]);
+  if (analyse.fees > 0) ins.push(['info', `Imported history contains ${esc(money(analyse.fees))} in international transaction fees (${analyse.feeCount} fee${analyse.feeCount > 1 ? 's' : ''}). These may also relate to other purchases and are not included in subscription estimates.`]);
   $('insights').innerHTML = ins.map(([k, h]) => `<li class="${k}"><span class="dot"></span><span>${h}</span></li>`).join('');
   $('insights').hidden = !ins.length;
 
@@ -794,6 +875,7 @@ function rowHtml(s) {
     cancel: 'Paying for something you don\'t use',
     dispute: 'Possible unauthorised charge',
     cancelled: `Cancelled ${s.cancelledOn ? fmtDate(s.cancelledOn) : ''}`,
+    excluded: 'Excluded from estimates',
     after: 'Charged again after cancelling'
   }[s.rec];
   const charges = s.charges.slice(-8).map(c => {
@@ -816,7 +898,7 @@ function rowHtml(s) {
       <div class="money">
         <span class="amt">${esc(money(s.perCharge))} <span class="muted small">${s.billingKnown ? CAD_LABEL[s.billing] : 'per charge'}</span></span>
         <span class="small muted">${s.count} charge${s.count > 1 ? 's' : ''} · last ${esc(fmtDate(s.last))}</span>
-        ${s.billing !== 'monthly' ? `<span class="small muted">≈ ${esc(money(s.monthly))} a month</span>` : ''}
+        ${s.billingKnown && s.billing !== 'monthly' ? `<span class="small muted">≈ ${esc(money(s.monthly))} a month</span>` : ''}
       </div>
       <div class="usage">
         <label class="label" for="u-${k}">Last used</label>
@@ -832,7 +914,9 @@ function rowHtml(s) {
     ${open ? `
     <div class="how">
       <div class="col">
-        <p class="small muted">${esc(recNote)}.</p>
+        <p class="small muted">${esc(recNote)}. Vendor matches are candidates: one-off purchases and multiple accounts may share a descriptor. Review the charge list before applying decisions to this whole group.</p>
+        <label>Billing period <select data-act="billing"><option value="">Infer from dates</option>${Object.entries(CAD_LABEL).map(([v,l])=>`<option value="${v}" ${S.meta[s.key]?.billing===v?'selected':''}>${l}</option>`).join('')}</select></label>
+        <button type="button" data-act="exclude">${s.status==='excluded'?'Include candidate again':'Not a subscription'}</button>
         <h3>Cancel ${esc(s.name.replace(/ \(.*\)$/, ''))}</h3>
         <ol>${steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
         <div class="row-btns">${link}</div>
@@ -851,7 +935,7 @@ function rowHtml(s) {
         <div class="charges">${charges}</div>
         <div class="row-btns">
           <button type="button" data-act="email">Copy cancellation email</button>
-          <button type="button" data-act="dispute">Copy bank dispute letter</button>
+          ${['dispute','after'].includes(s.rec) ? `<fieldset><legend>Select payments to investigate</legend>${s.charges.map((c,i)=>`<label style="display:block"><input type="checkbox" data-charge="${i}"> ${esc(c.date)} ${esc(money(c.amount))} ${esc(c.desc)}</label>`).join('')}<p class="note">Check receipts and shared accounts first. Select only relevant charges; the draft asks the bank to investigate.</p><button type="button" data-act="dispute">Draft bank investigation letter</button></fieldset>` : ''}
         </div>
         <textarea class="copybox" id="t-${k}" spellcheck="false" hidden readonly></textarea>
         <p class="note" id="m-${k}" hidden></p>
@@ -873,7 +957,7 @@ async function copyText(text, box, msg) {
     msg.textContent = 'Copied. Paste it into your email or a document, then fill in the [brackets].';
   } catch (e) {
     box.focus(); box.select();
-    msg.textContent = 'Your browser blocked copying. The text is selected above: press Ctrl/⌘ + C to copy it.';
+    msg.textContent = 'Your browser blocked copying. The text is selected above: use your device’s Copy command (on a phone, touch and hold the selected text).';
   }
   msg.hidden = false;
 }
@@ -885,6 +969,7 @@ $('list').addEventListener('click', e => {
   const sub = analyse().find(s => s.key === key); if (!sub) return;
   const act = b.dataset.act;
   if (act === 'toggle') { openRows.has(key) ? openRows.delete(key) : openRows.add(key); render(); return; }
+  if (act === 'exclude') return setMeta(key, {status:sub.status==='excluded'?'':'excluded'});
   if (act === 'keep') return setMeta(key, { status: 'keep' });
   if (act === 'undo') return setMeta(key, { status: '', cancelledOn: '' });
   if (act === 'cancelled') {
@@ -893,12 +978,18 @@ $('list').addEventListener('click', e => {
   }
   const box = row.querySelector('textarea.copybox'); const msg = row.querySelector('p.note[id^="m-"]');
   if (act === 'email') copyText(cancelEmail(sub), box, msg);
-  if (act === 'dispute') copyText(disputeLetter(sub), box, msg);
+  if (act === 'dispute') {
+    const selected = [...row.querySelectorAll('input[data-charge]:checked')].map(c=>sub.charges[Number(c.dataset.charge)]);
+    if (!selected.length) return toast('err', 'Select the payments you want the bank to investigate.');
+    copyText(disputeLetter(sub,selected), box, msg);
+  }
 });
 $('list').addEventListener('change', e => {
-  const sel = e.target.closest('select[data-act="usage"]'); if (!sel) return;
+  const sel = e.target.closest('select[data-act]'); if (!sel) return;
   const key = sel.closest('.sub').dataset.key;
-  setMeta(key, { usage: sel.value });
+  const act=sel.dataset.act;
+  setMeta(key, act==='billing' ? {billing:sel.value} : {usage:sel.value});
+  [...$('list').querySelectorAll('.sub')].find(r=>r.dataset.key===key)?.querySelector(`select[data-act="${act}"]`)?.focus();
 });
 $('filters').addEventListener('click', e => {
   const b = e.target.closest('button[data-filter]'); if (!b) return;
@@ -906,7 +997,9 @@ $('filters').addEventListener('click', e => {
 });
 
 function readFiles(files) {
+  if (files.length !== 1) return toast('err', 'Import one statement at a time so you can review each preview.');
   [...files].forEach(f => {
+    if (f.size > 5000000) return toast('err', 'Statement too large. Use a CSV smaller than 5 MB.');
     const r = new FileReader();
     r.onload = () => importText(String(r.result || ''), f.name);
     r.onerror = () => toast('err', `Couldn't open ${f.name}. Try downloading the statement again.`);
@@ -915,6 +1008,9 @@ function readFiles(files) {
     r.readAsText(f);
   });
 }
+$('chooseFile').addEventListener('click', () => $('file').click());
+$('confirmImport').addEventListener('click', commitImport);
+$('cancelImport').addEventListener('click', () => {pendingImport=null;$('preview').hidden=true;$('previewRows').textContent='';$('previewInfo').textContent='';});
 $('file').addEventListener('change', e => { readFiles(e.target.files); e.target.value = ''; });
 const drop = $('drop');
 ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
@@ -925,17 +1021,17 @@ $('scanPaste').addEventListener('click', () => {
   if (!t.trim()) { toast('err', 'The box is empty. Paste your statement text first.'); return; }
   importText(t, 'the pasted text');
 });
-$('loadExample').addEventListener('click', () => { loadExample(); render(); toast('ok', 'Example statement loaded. Try changing “Last used” on a row, then open “How to cancel”.'); });
+$('loadExample').addEventListener('click', () => { if (S.txns.length && !S.example && !confirm('Replace your real payments and decisions with demo data? Copy a backup first.')) return; pendingImport=null; $('preview').hidden=true; $('previewRows').textContent=''; loadExample(); render(); toast('ok', 'Example statement loaded. Try changing “Last used” on a row, then open “How to cancel”.'); });
 $('clearExample').addEventListener('click', () => {
   S.txns = []; S.meta = {}; S.example = false; openRows.clear(); save(); render();
   $('toast').hidden = true; $('import').scrollIntoView({ behavior: 'smooth' });
 });
 
-$('cur').addEventListener('input', e => { S.settings.cur = e.target.value.trim(); save(); render(); });
-$('dateOrder').addEventListener('change', e => { S.settings.order = e.target.value; save(); });
+$('cur').readOnly=true;
+$('dateOrder').addEventListener('change', e => { S.settings.order = e.target.value; $('importOrder').value=e.target.value; save(); });
 const io = $('ioBox'), ioMsg = $('ioMsg');
 $('copyReport').addEventListener('click', () => {
-  const q = v => `"${String(v).replace(/"/g, '""')}"`;
+  const q = v => { const text=String(v); return `"${(/^[\t\r\n]|^\s*[=+@-]/.test(text) ? "'" : '') + text.replace(/"/g, '""')}"`; };
   const lines = [['Subscription', 'Statement name', 'Category', 'Charges', 'Per charge', 'Billing', 'Per month', 'Last charged', 'Last used', 'Recommendation', 'Cancelled on'].map(q).join(',')];
   for (const s of analyse()) lines.push([s.name, s.desc, s.category, s.count, s.perCharge.toFixed(2), s.billingKnown ? CAD_LABEL[s.billing] : 'unknown', s.monthly.toFixed(2), s.last, USAGE_LABEL[s.usage] && s.usage ? USAGE_LABEL[s.usage] : '', REC[s.rec], s.cancelledOn].map(q).join(','));
   copyText(lines.join('\n'), io, ioMsg);
@@ -948,10 +1044,10 @@ $('restoreBackup').addEventListener('click', () => {
     ioMsg.textContent = 'Paste your backup text into the box, then press “Restore from backup” again.'; ioMsg.hidden = false; return;
   }
   try {
-    const d = JSON.parse(io.value);
-    if (!d || !Array.isArray(d.txns)) throw new Error('bad');
-    S = Object.assign({ txns: [], meta: {}, settings: { cur: 'K', order: 'dmy' }, example: false }, d);
-    save(); syncSettings(); render(); ioMsg.textContent = `Restored ${S.txns.length} payments.`;
+    const restored = validateState(JSON.parse(io.value));
+    if (S.txns.length && !confirm('Replace current payments and decisions with this validated backup?')) return;
+    S = restored; openRows.clear(); pendingImport=null; $('preview').hidden=true; $('previewRows').textContent='';
+    migrateDecisions(); save(); syncSettings(); render(); io.value=''; ioMsg.textContent = storageError ? 'Restored in memory only. Storage failed; retain your backup.' : `Restored ${S.txns.length} payments.`;
   } catch (e) { ioMsg.textContent = 'That text isn\'t a KaruScan backup. Copy the whole backup and try again.'; }
   restoring = false;
 });
@@ -960,9 +1056,10 @@ $('eraseAll').addEventListener('click', e => {
   if (!eraseArmed) { eraseArmed = true; e.target.textContent = 'Tap again to erase everything'; setTimeout(() => { eraseArmed = false; e.target.textContent = 'Erase all data'; }, 4000); return; }
   eraseArmed = false; e.target.textContent = 'Erase all data';
   S.txns = []; S.meta = {}; S.example = false; openRows.clear(); save(); render();
-  ioMsg.textContent = 'All statements and decisions erased from this browser.'; ioMsg.hidden = false; io.hidden = true;
+  $('pasteBox').value=''; io.value=''; $('previewRows').textContent=''; $('previewInfo').textContent=''; $('preview').hidden=true; pendingImport=null; restoring=false;
+  ioMsg.textContent = storageError ? 'Cleared this page, but browser storage failed. Clear site data in browser settings before leaving.' : 'Statements and decisions erased here. Previously exported files and clipboard copies must be cleared separately.'; ioMsg.hidden = false; io.hidden = true;
 });
-function syncSettings() { $('cur').value = S.settings.cur; $('dateOrder').value = S.settings.order; }
+function syncSettings() { $('cur').value = $('importCur').value = S.settings.cur; $('dateOrder').value = $('importOrder').value = S.settings.order; $('debitSign').value=S.settings.sign || 'negative'; }
 
 /* ---------- Example statement (made-up figures) ---------- */
 function loadExample() {
@@ -996,15 +1093,18 @@ function loadExample() {
     'c:midjourney': { usage: 'never' }, 'c:otter': { usage: 'quarter' }, 'c:canva': { usage: 'month' },
     'c:paddle': { usage: 'unknown' }, 'c:netflix': { usage: 'month' }, 'c:grammarly': { usage: 'old' }
   };
-  openRows.add('c:paddle');
+  const previous=S.meta; S.meta={};
+  for (const t of S.txns) {const id=identify(t.desc);if(id.cat && id.cat.via) id.key+=':'+t.amount.toFixed(2);if(id.cat && previous['c:'+id.cat.id]) S.meta[id.key]=previous['c:'+id.cat.id];}
   save();
 }
 
 /* ---------- Start ---------- */
-if (!load() || (!S.txns.length && !Object.keys(S.meta).length)) loadExample();
+load();
+migrateDecisions();
 syncSettings();
 render();
 })();
 </script>
 </body>
 </html>
+
